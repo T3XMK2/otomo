@@ -1,0 +1,10 @@
+# build outputs
+*.o
+*.elf
+*.prx
+exports.c
+.pio/
+# your Wi-Fi
+esp32c3/otomo_link/include/wifi_secrets.h
+# the plugin address of your network
+psp/otomo_body.cfg
