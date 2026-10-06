@@ -4,702 +4,726 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Otomo</title>
-<!-- One self-contained page, no external files (backlog A8: the ESP32 will serve it from flash).
-     A DASHBOARD (owner, 4 Oct 2026: the theme yes, the spinning 3D background no): themed tiles; the 3D brain is one
-     tile, still, turned only by hand, drawn in the same style. The brain is the REAL network (/api/brain/<id>: layers,
-     strongest weights, the links the last lesson moved) with the live activations of /api/stream. Nothing is decorative.
-     The look follows the game's own menus (colours / shapes sampled from MHFU screenshots); no game artwork is copied. -->
+<!-- One self-contained page, no external files: the ESP32-C3 serves it from flash (gzipped).
+     Design (owner, 6 Oct 2026, after three attempts he rejected): built on published principles, not on decoration -
+     Refactoring UI (one primary element per view; hierarchy by size + weight + tone together; a fixed spacing scale
+     4/8/16/24/32; few borders - space and lighter surfaces separate things), Laws of UX (5-7 blocks a view: Miller;
+     one primary action: Hick; related things close: proximity / common region; the odd one stands out: Von Restorff),
+     dark UI (warm dark grey, not black; lighter = higher; desaturated colours). Pictures are data graphics, not clip art.
+     Live: the latest choice (primary), who is in control + the one button, the moments on a timeline, who decided
+     (a ring), the decision inside the brain, what it senses. Life: the comrade in numbers, its tastes, its experience.
+     One screen on a desktop; every block has a fixed place and size. -->
 <style>
-:root{--bg:#0d0d0f;--slate:#34353c;--slate2:#26272c;--deep:#1b1c20;--band:#46474e;--rule:rgba(255,255,255,.13);
---text:#f2f2ee;--dim:#a3a39b;--yellow:#efe27a;--green:#00b439;--green2:#3fd05f;--leather:#b8722f;--leather2:#7a4518;
---stud:#d9944a;--red:#e0473b;--amber:#ffc04a;--blue:#3aa7d8;--teal:#2fae9e;--r:4px;
---font:"Trebuchet MS","Segoe UI",ui-sans-serif,system-ui,sans-serif}
+:root{--bg:#111215;--s1:#1c1e23;--s2:#23252b;--s3:#2f3139;--line:#2a2c33;
+--t1:#ecebe6;--t2:#a5a49d;--t3:#6e6e6c;--accent:#efe27a;--accentT:#1d1a10;--cursor:#3fd05f;
+--own:#7fcf98;--agreed:#e2cd85;--game:#88b5d6;--reflex:#7b7a75;--bad:#e07a6e;--warm:#dca35c;--cool:#9a8fd4;
+--font:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
 *{box-sizing:border-box}[hidden]{display:none!important}
-*{scrollbar-width:thin;scrollbar-color:#5a5b62 var(--deep)}
-html,body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 var(--font);letter-spacing:.04em;
-text-shadow:0 1px 0 rgba(0,0,0,.6)}
-body{background:radial-gradient(ellipse at 50% 0%,#24221c 0%,var(--bg) 60%) fixed}
-/* a game panel: slate body, leather stitched edges top and bottom, studs at the corners */
-.tile{position:relative;background:linear-gradient(180deg,var(--slate) 0%,var(--slate2) 100%);border:2px solid #0b0b0d;
-border-radius:var(--r);box-shadow:0 0 0 1px rgba(255,255,255,.06) inset,0 10px 26px rgba(0,0,0,.5);padding:0 14px 14px;min-width:0}
-.tile::before,.tile::after{content:"";position:absolute;left:6px;right:6px;height:5px;border-radius:2px;
-background:repeating-linear-gradient(90deg,var(--leather) 0 6px,var(--leather2) 6px 8px);box-shadow:0 1px 0 rgba(0,0,0,.6)}
-.tile::before{top:-4px}.tile::after{bottom:-4px}
-.studs{position:absolute;inset:-5px;pointer-events:none}
-.studs i{position:absolute;width:7px;height:7px;background:var(--stud);border:1px solid #3a1e08;border-radius:1px}
-.studs i:nth-child(1){left:0;top:0}.studs i:nth-child(2){right:0;top:0}.studs i:nth-child(3){left:0;bottom:0}.studs i:nth-child(4){right:0;bottom:0}
-/* the title band: dark, yellow spaced text, green arrows */
-h3{position:relative;margin:0 -14px 10px;padding:7px 26px;font-size:12px;letter-spacing:.22em;color:var(--yellow);font-weight:600;
-background:linear-gradient(180deg,#55565d,var(--band));border-bottom:1px solid #121215;display:flex;justify-content:space-between;align-items:center}
-h3::before,h3::after{content:"";position:absolute;top:50%;margin-top:-6px;border:6px solid transparent}
-h3::before{left:7px;border-right:8px solid var(--green);border-left:0}
-h3::after{right:7px;border-left:8px solid var(--green);border-right:0}
-h3 small{color:var(--dim);letter-spacing:.06em;font-weight:400;font-size:11px}
-h4{margin:12px 0 4px;font-size:11px;letter-spacing:.2em;color:var(--yellow);font-weight:600}
-button,select,input{font:inherit;letter-spacing:.06em;color:var(--text);background:var(--deep);border:1px solid #0b0b0d;
-box-shadow:0 0 0 1px rgba(255,255,255,.1) inset;border-radius:2px;padding:6px 10px;outline:none;text-shadow:inherit}
-button{cursor:pointer}button:hover{background:#2c2d33}button:active{transform:translateY(1px)}button:disabled{opacity:.4;cursor:default}
-select option{background:var(--deep)}input:focus,select:focus{box-shadow:0 0 0 1px var(--green) inset}
-.go,#attach{background:linear-gradient(180deg,#19c94b,#009a30);border-color:#04460f;color:#fff;font-weight:700}
-.go:hover,#attach:hover{background:linear-gradient(180deg,#2bd85a,#00a836)}
-#attach.detach{background:var(--deep);color:var(--green2);box-shadow:0 0 0 1px var(--green) inset}
-/* top bar */
-#top{display:flex;align-items:center;gap:8px;padding:9px 12px;margin:14px 14px 0;white-space:nowrap;flex-wrap:wrap}
-.logo{font-weight:700;letter-spacing:.3em;font-size:12px;color:var(--yellow);padding:0 6px}
-.grow{flex:1}
-.plate{display:flex;align-items:center;gap:8px;height:30px;padding:0 22px 0 4px;background:#17181b;
-clip-path:polygon(0 0,calc(100% - 8px) 0,100% 16%,calc(100% - 6px) 33%,100% 50%,calc(100% - 6px) 67%,100% 84%,calc(100% - 8px) 100%,0 100%)}
-.plate .ic{width:22px;height:22px;border-radius:2px;background:var(--teal);display:grid;place-items:center}
-.plate select{background:transparent;border:0;box-shadow:none;font-size:14px;letter-spacing:.18em;padding:4px 2px}
-#pill{display:flex;align-items:center;gap:8px;padding:5px 12px;background:#17181b;box-shadow:0 0 0 1px rgba(255,255,255,.08) inset;border-radius:2px;font-weight:600}
-#dot{width:10px;height:10px;border-radius:1px;transform:rotate(45deg);background:var(--dim)}
-#dot.on{background:var(--green2);box-shadow:0 0 8px var(--green2);animation:pulse 1.6s infinite}
-#dot.wait{background:var(--amber)}#dot.bad{background:var(--red)}
-@keyframes pulse{50%{box-shadow:0 0 2px var(--green2)}}
-/* the dashboard (owner, 5 Oct: no stray scroll bars, tidy spacing). On a desktop screen it fills the window exactly:
-   the brain takes the free space, every other tile has a fixed share, and lists show the rows that fit (with pages),
-   never a scroll bar. Narrow or short screens fall back to a normal scrolling page. */
-#dash{display:grid;grid-template-columns:300px minmax(0,1fr) 330px;gap:16px;padding:16px 14px 16px;align-items:start}
-.col{display:flex;flex-direction:column;gap:16px;min-width:0;min-height:0}
-@media (min-width:1180px) and (min-height:760px){
-  html,body{height:100%;overflow:hidden}
-  body{display:flex;flex-direction:column}
-  #dash{flex:1;min-height:0;align-items:stretch}
-  .col{height:100%}
-  .col .fill{flex:1 1 0;min-height:0;display:flex;flex-direction:column;overflow:hidden}
-  #brainTile.fill #brainBox{flex:1;aspect-ratio:auto;max-height:none;min-height:0}
-  #experience{height:230px;flex:none;display:flex;flex-direction:column}
-  #xBody{flex:1;min-height:0;overflow:hidden}
+html,body{margin:0;background:var(--bg);color:var(--t1);font:14px/1.5 var(--font);-webkit-font-smoothing:antialiased}
+button,select,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;border-radius:4px;background:var(--s3);color:var(--t1);padding:8px 16px;font-weight:600}
+button:hover:not(:disabled){filter:brightness(1.12)}button:disabled{opacity:.4;cursor:default}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+select,input{background:var(--s2);border:1px solid var(--line);border-radius:4px;padding:7px 10px}
+.t2{color:var(--t2)}.t3{color:var(--t3)}.grow{flex:1}.num{font-variant-numeric:tabular-nums}
+.app{max-width:1440px;margin:0 auto;padding:0 24px 24px;display:flex;flex-direction:column}
+/* header */
+header.top{display:flex;align-items:center;gap:24px;height:64px;flex:none}
+.mark{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:.02em}
+.mark{color:var(--accent);letter-spacing:.24em;text-transform:uppercase;font-size:14px}
+.mark i{width:10px;height:10px;background:var(--accent);transform:rotate(45deg);box-shadow:0 0 0 2px var(--bg),0 0 0 3px color-mix(in srgb,var(--accent) 50%,transparent)}
+.cat{display:flex;align-items:center;gap:8px;color:var(--t2)}
+.cat .sw{width:12px;height:12px;border-radius:50%;box-shadow:0 0 0 2px var(--bg),0 0 0 3px var(--s3)}
+.cat b{color:var(--t1);font-weight:600}
+nav{display:flex;gap:4px;height:100%}
+nav button{background:none;border-radius:0;outline:none;color:var(--t3);padding:0 12px;height:100%;box-shadow:inset 0 -2px 0 transparent;font-weight:600}
+nav button.on{color:var(--accent);box-shadow:inset 0 -2px 0 var(--accent)}
+nav button.on::before{content:"";display:inline-block;border:5px solid transparent;border-left:7px solid var(--cursor);border-right:0;margin-right:7px;vertical-align:0}
+.ghost{background:none;color:var(--t2);font-weight:500}.ghost:hover{color:var(--t1)}
+/* blocks: a lighter surface, generous padding, a small label - no borders, no bands */
+.card{position:relative;background:var(--s1);border-radius:4px;padding:20px 24px;min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+/* one MHFU detail (owner, 6 Oct: only small touches): the game's woven teal / red menu edge as a hairline on top of each
+   block, with its two orange studs at the corners */
+.card::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;pointer-events:none;background:
+linear-gradient(#b47341,#b47341) 0 0/4px 4px no-repeat,linear-gradient(#b47341,#b47341) 100% 0/4px 4px no-repeat,
+repeating-linear-gradient(90deg,#94524a 0 5px,#185a5a 5px 10px) 0 1px/100% 2px no-repeat}
+.lbl{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb,var(--accent) 80%,var(--t3));display:flex;align-items:center;gap:12px;flex:none;margin-bottom:12px}
+.lbl::before{content:"";border:5px solid transparent;border-left:7px solid var(--cursor);border-right:0;margin-right:-4px}
+.lbl .r{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:500;color:var(--t3)}
+.empty{margin:auto;text-align:center;color:var(--t3)}
+/* the kinds of moment: one colour each, the same everywhere */
+.k-own{--k:var(--own)}.k-agreed{--k:var(--agreed)}.k-game{--k:var(--game)}.k-reflex,.k-only{--k:var(--reflex)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--k);flex:none}
+/* LIVE: a fixed grid - the latest choice is the one primary element */
+.view{flex:1;min-height:0;display:grid;gap:16px}
+#v-live{grid-template-columns:minmax(0,2fr) minmax(300px,1fr);grid-template-rows:184px 140px minmax(0,1fr);
+grid-template-areas:"hero ctl" "time ring" "brain senses"}
+#hero{grid-area:hero;flex-direction:row;gap:32px}#ctl{grid-area:ctl}#time{grid-area:time}#ring{grid-area:ring}#brain{grid-area:brain}#senses{grid-area:senses}
+.heroL{flex:1;min-width:0;display:flex;flex-direction:column}
+.kind{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--k)}
+#hWhat{font-size:44px;line-height:1.05;font-weight:700;letter-spacing:-.01em;margin:10px 0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hWhy{font-size:16px;color:var(--t2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hWhy b{color:var(--t1);font-weight:600}
+.odds{width:280px;flex:none;display:flex;flex-direction:column;justify-content:center;gap:14px}
+.odd .row{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--t2);margin-bottom:6px}
+.odd .row span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.odd.pick .row{color:var(--t1);font-weight:600}
+.odd small{color:var(--t3);font-weight:500;margin-left:6px}
+.track{height:4px;background:var(--s3);border-radius:2px;overflow:hidden}.track i{display:block;height:100%;background:var(--t3);transition:width .4s}
+.odd.pick .track i{background:var(--k)}
+/* who is in control */
+#ctl{justify-content:space-between}
+.state{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:600;line-height:1.3}
+.state .dot{width:10px;height:10px}
+#ctl.on .state .dot{animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--k) 25%,transparent)}}
+#cSub{color:var(--t2);margin-top:4px}#cSub.err{color:var(--bad)}
+#attach{height:44px;width:100%;font-size:15px}
+#attach.primary{background:#16a843;color:#fff}
+/* the moments: a timeline */
+#tl{width:100%;flex:1;min-height:0;display:block}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--t3);text-transform:none;letter-spacing:0;font-weight:500}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+/* who decided: a ring */
+.ringBox{display:flex;align-items:center;gap:24px;flex:1;min-height:0}
+#ringSvg{width:84px;height:84px;flex:none}
+.rl{display:grid;grid-template-columns:auto 1fr auto;gap:3px 10px;align-items:center;font-size:13px;color:var(--t2);flex:1}
+.rl b{color:var(--t1);font-weight:600;text-align:right}
+/* the brain */
+#b3{width:100%;flex:1;min-height:0;display:block;cursor:grab}#b3:active{cursor:grabbing}
+/* senses */
+.meters{display:flex;flex-direction:column;gap:10px}
+.meter .row{display:flex;justify-content:space-between;font-size:13px;color:var(--t2);margin-bottom:4px;line-height:20px}
+.meter .row b{color:var(--t1);font-weight:600}
+.track i.hp{background:var(--own)}.track i.mid{background:var(--agreed)}.track i.low{background:var(--bad)}
+.lesson{margin-top:auto;padding-top:10px;display:flex;align-items:baseline;gap:8px;font-size:13px;color:var(--t2)}
+.lesson b{color:var(--t1);font-weight:600}
+/* LIFE */
+#v-life{grid-template-columns:minmax(320px,1fr) minmax(0,2fr);grid-template-rows:minmax(0,1fr)}
+#who h1{font-size:32px;line-height:1.15;margin:0;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:12px}
+#who h1 .sw{width:16px;height:16px;border-radius:50%;box-shadow:0 0 0 3px var(--s1),0 0 0 4px var(--s3)}
+#iPers{color:var(--t2);margin-top:4px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 12px;margin:24px 0}
+.kpi b{display:block;font-size:22px;font-weight:700;line-height:1.2}.kpi span{font-size:12px;color:var(--t3)}
+.sec{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:color-mix(in srgb,var(--accent) 80%,var(--t3));margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.sec::before{content:"";border:5px solid transparent;border-left:7px solid var(--cursor);border-right:0}
+#radar{width:100%;flex:1;min-height:120px;display:block}
+.tabs{display:flex;gap:4px;margin-bottom:16px;flex:none}
+.tabs button{background:none;color:var(--t3);padding:6px 12px}.tabs button.on{background:var(--s3);color:var(--t1)}
+.pager{margin-left:auto;display:flex;align-items:center;gap:4px;color:var(--t3);font-size:13px}.pager button{padding:4px 10px;background:var(--s2)}
+.list{flex:1;min-height:0;overflow:hidden}
+.it{display:grid;grid-template-columns:minmax(0,1fr) 220px 48px;gap:16px;align-items:center;height:56px}
+.it+.it{box-shadow:inset 0 1px 0 var(--line)}
+.it .a{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.it .a span{color:var(--t3);font-weight:400}
+.it .c{font-size:12px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .p{text-align:right;font-weight:600}
+.db{position:relative;height:16px}
+.db::before{content:"";position:absolute;left:0;right:0;top:7px;height:2px;background:var(--s3)}
+.db i{position:absolute;top:7px;height:2px;background:var(--warm)}
+.db u,.db s{position:absolute;top:3px;width:10px;height:10px;margin-left:-5px;border-radius:50%}
+.db u{background:var(--s1);box-shadow:inset 0 0 0 2px var(--t3)}.db s{background:var(--warm)}
+.dr{display:grid;grid-template-columns:8px minmax(0,1fr) auto;gap:14px;align-items:center;height:48px}
+.dr+.dr{box-shadow:inset 0 1px 0 var(--line)}
+.dr .a{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.dr .c{font-size:12px;color:var(--t3)}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:0 8px;height:40px}th{font-size:12px;color:var(--t3);font-weight:600}
+td{box-shadow:inset 0 1px 0 var(--line)}td.n,th.n{text-align:right}
+/* one screen on a desktop */
+@media (min-width:980px) and (min-height:600px){html,body{height:100%;overflow:hidden}.app{height:100%}}
+@media (max-width:979px){
+  #v-live{grid-template-columns:1fr;grid-template-rows:none;grid-template-areas:"ctl" "hero" "ring" "time" "senses" "brain"}
+  #v-life{grid-template-columns:1fr}#hero{flex-direction:column;gap:16px}.odds{width:auto}#hWhat{font-size:32px}
+  #time{height:156px}#brain{height:280px}.list{overflow:visible}header.top{gap:12px;flex-wrap:wrap;height:auto;padding:12px 0}
 }
-@media (max-width:1179px){#dash{grid-template-columns:300px minmax(0,1fr)}.col.right{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}}
-@media (max-width:760px){#dash{grid-template-columns:1fr}}
-.row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--rule)}
-.k{color:var(--dim)}.muted{color:var(--dim)}
-.gauge{height:8px;background:#0e0e10;border:1px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.08);overflow:hidden;margin:3px 0 2px}
-.gauge>i{display:block;height:100%;width:0;transition:width .35s ease;background:linear-gradient(180deg,#2fd04f 0 35%,#e7e46a 35% 55%,#13a43a 55% 100%)}
-.gauge>i.hp-mid{background:linear-gradient(180deg,#ffc04a 0 35%,#ffe9a0 35% 55%,#d98a12 55% 100%)}
-.gauge>i.hp-low{background:linear-gradient(180deg,#ff6a55 0 35%,#ffc0a0 35% 55%,#c8261a 55% 100%)}
-.gauge>i.red{background:linear-gradient(180deg,#ff6a55,#b8231a)}.gauge>i.amb{background:linear-gradient(180deg,#ffd06a,#d98a12)}
-.gauge>i.blu{background:linear-gradient(180deg,#6fc6ee,#2a86b8)}.gauge>i.dimb{background:linear-gradient(180deg,#d8d8d0,#8f8f88)}
-.chip{display:inline-block;padding:1px 9px;background:#17181b;box-shadow:0 0 0 1px rgba(255,255,255,.1) inset;font-size:11.5px;border-radius:2px;margin:2px 4px 2px 0}
-.chip.hot{color:#ffb0a8;box-shadow:0 0 0 1px rgba(224,71,59,.6) inset}
-.strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:4px 16px;margin-top:10px;align-items:end}
-.strip .row{font-size:11.5px;border:0;padding:0 0 2px;white-space:nowrap}
-.strip .row .k{overflow:hidden;text-overflow:ellipsis}
-@media (max-width:760px){.strip{grid-template-columns:1fr 1fr}}
-.styles{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;align-items:center;font-size:11.5px}
-/* the cat tile */
-.catname{font-size:24px;font-weight:700;letter-spacing:.22em;margin:2px 0 0}
-.coat{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dim)}
-.coat i{width:12px;height:12px;border-radius:2px;border:1px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.15)}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:0 12px;margin:6px 0}
-.traits{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
-.traits>div{background:var(--deep);box-shadow:0 0 0 1px rgba(255,255,255,.07) inset;padding:4px 8px;font-size:12px}
-.traits span{display:block;font-size:10.5px;color:var(--dim);letter-spacing:.12em}
-.kv>div{padding:4px 0;border-bottom:1px solid var(--rule)}.kv>div:nth-child(odd){color:var(--dim)}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:10px 0 0}
-.stat{background:var(--deep);box-shadow:0 0 0 1px rgba(255,255,255,.08) inset;padding:8px 4px;text-align:center}
-.stat b{display:block;font-size:18px;color:var(--yellow)}.stat span{font-size:10.5px;color:var(--dim)}
-/* the brain tile */
-#brainTile{padding-bottom:10px}
-#brainBox{position:relative;aspect-ratio:16/10;max-height:600px;min-height:280px;margin:0 -6px;border:1px solid #0b0b0d;
-background:radial-gradient(ellipse at 50% 45%,#2c2d33 0%,#1a1b1f 70%);box-shadow:0 0 0 1px rgba(255,255,255,.05) inset}
-#brain{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab}#brain:active{cursor:grabbing}
-.legend{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:10.5px;color:var(--dim);margin-top:6px}
-.legend b{font-weight:400}
-/* decision / timeline / experience */
-.big{font-size:16px;font-weight:700;line-height:1.3;letter-spacing:.08em}
-.arrow{color:var(--yellow);opacity:.85;font-size:10.5px;margin:7px 0 2px;letter-spacing:.2em}
-.opts{display:grid;grid-template-columns:minmax(0,1fr) 72px 38px;align-items:center;font-size:12px;margin-top:8px}
-.opts>*{padding:4px;border-bottom:1px solid var(--rule)}.opts .gauge{margin:0}
-.opts .sel{background:var(--green);color:#fff;font-weight:700;border-bottom-color:transparent}
-.tl{display:flex;flex-direction:column;font-size:11.5px;overflow:hidden;min-height:0}
-.tl div{display:flex;gap:8px;align-items:baseline;padding:3px 0;border-bottom:1px solid var(--rule)}
-.tl .t{color:var(--dim);width:40px;flex:none;text-align:right}
-#timeline .tl{flex:1}
-.tl .d{width:7px;height:7px;flex:none;transform:rotate(45deg);margin-top:4px}
-.tabs{display:flex;gap:4px;margin-bottom:8px}.tabs button{padding:3px 12px;font-size:11.5px}
-.tabs button.on{background:var(--green);color:#fff;box-shadow:none;font-weight:700}
-.habit{padding:6px 0;border-bottom:1px solid var(--rule)}.habit .s{font-size:11px;color:var(--dim)}
-.pager{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim)}
-.pager button{padding:1px 8px}
-.prof{display:grid;grid-template-columns:auto 1fr 1fr;gap:3px 8px;align-items:center;font-size:11.5px}
-.prof .gauge{margin:0}
-table{width:100%;border-collapse:collapse;font-size:12px}td,th{text-align:left;padding:4px 5px;border-bottom:1px solid var(--rule)}
-th{color:var(--yellow);font-weight:500;letter-spacing:.14em}
-#tip{position:fixed;pointer-events:none;z-index:9;padding:7px 10px;font-size:11.5px;display:none;max-width:280px;
-background:var(--deep);border:1px solid #000;box-shadow:0 0 0 1px var(--leather) inset,0 6px 18px rgba(0,0,0,.6)}
-/* the New cat drawer */
-.drawer{position:fixed;top:0;right:0;height:100%;width:min(470px,100%);z-index:8;padding:0 20px 20px;overflow-x:hidden;
-overflow-y:auto;transform:translateX(105%);transition:transform .28s ease}
-.drawer .studs,.drawer::before,.drawer::after{display:none}
-.drawer.open{transform:none}
-.drawer h3{margin:0 -20px 12px}
-.drawer .x{position:absolute;right:30px;top:4px;z-index:2;padding:2px 9px}
-form{display:grid;gap:8px}label.f{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--dim)}
-.skills{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px 8px;padding:8px;background:var(--deep)}
-.skills label{display:flex;gap:5px;align-items:center;font-size:11px;color:var(--text);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.skills input{margin:0;flex:none}
-.msg{min-height:1.3em;font-size:12px}.msg.ok{color:var(--green2)}.msg.err{color:#ff8a7e}
+/* tooltip, toast, home */
+#tip{position:fixed;pointer-events:none;z-index:20;max-width:280px;padding:8px 12px;font-size:13px;display:none;background:var(--s3);border-radius:4px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:40;background:var(--s3);padding:10px 16px;border-radius:4px;display:none}
+#home{position:fixed;inset:0;z-index:30;display:grid;place-items:center;background:rgba(0,0,0,.6);padding:16px}
+#home .card{width:min(440px,100%);background:var(--s2);gap:16px;overflow:auto;max-height:calc(100vh - 32px)}
+#home h2{margin:0;font-size:20px}
+form{display:grid;gap:12px}label.f{display:grid;gap:8px;font-size:13px;color:var(--t2)}
+.danger{background:none;color:var(--bad);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--bad) 50%,transparent)}
+.msg{min-height:1.4em;font-size:13px}.msg.err{color:var(--bad)}
+.rel{display:flex;align-items:center;gap:12px;padding:10px 0;box-shadow:inset 0 1px 0 var(--line)}
 </style>
 </head>
 <body>
-<header id="top" class="tile"><span class="studs"><i></i><i></i><i></i><i></i></span>
-  <div class="logo">OTOMO</div>
-  <span class="plate"><span class="ic"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path fill="#0d2a26"
-    d="M2 2l3 3h6l3-3v6c0 3.3-2.7 6-6 6s-6-2.7-6-6z"/><circle cx="6" cy="8" r="1" fill="#2fae9e"/><circle cx="10" cy="8" r="1" fill="#2fae9e"/></svg></span>
-    <select id="catSel" title="The neural cat"></select></span>
-  <button id="openNew">+ New brain</button>
-  <div class="grow"></div>
-  <select id="instSel" title="Game instance"><option value="1">Game 1</option><option value="2">Game 2</option>
-    <option value="3">Game 3</option><option value="0">Game 0</option></select>
-  <div id="pill"><i id="dot"></i><span id="state">Connecting…</span></div>
-  <button id="attach" disabled>Attach</button>
-</header>
+<div class="app">
+  <header class="top">
+    <div class="mark"><i></i>Otomo</div>
+    <div class="cat"><span class="sw" id="chipSw"></span><b id="chipName">—</b><span id="chipSub"></span></div>
+    <nav role="tablist"><button role="tab" data-v="live" class="on">Live</button><button role="tab" data-v="life">Life</button></nav>
+    <span class="grow"></span>
+    <select id="instSel" title="Game instance" hidden><option value="1">Game 1</option><option value="2">Game 2</option>
+      <option value="3">Game 3</option><option value="0">Game 0</option></select>
+    <button class="ghost" id="openHome">Home</button>
+  </header>
 
-<main id="dash">
-  <div class="col left">
-    <section class="tile" id="catTile"><span class="studs"><i></i><i></i><i></i><i></i></span>
-      <h3>Comrade <small id="cOrigin"></small></h3>
-      <p class="catname" id="cName">—</p>
-      <div class="coat" id="cCoat"></div>
-      <div class="muted" id="cPers" style="margin-top:4px"></div>
-      <div class="traits" id="cMeaning"></div>
-      <div id="cSkills"></div>
-      <div class="kv"><div>Owner</div><div id="cOwner">—</div><div>Born</div><div id="cBorn">—</div>
-        <div>Body</div><div id="cBody">—</div></div>
-      <div class="stats"><div class="stat"><b id="gQ">0</b><span>quests</span></div><div class="stat"><b id="gT">0</b><span>attached</span></div>
-        <div class="stat"><b id="gL">0</b><span>decisions</span></div></div>
-    </section>
-    <section class="tile fill" id="tastesTile"><span class="studs"><i></i><i></i><i></i><i></i></span>
-      <h3>Tastes <small>what matters to it</small></h3>
-      <div class="styles" id="tastes"><span class="muted" style="grid-column:1/-1">Born with the first quest attached.</span></div>
-      <div class="muted" style="font-size:11px;margin-top:6px">Its own: born around its personality, drifting after every quest.</div>
-    </section>
-  </div>
-
-  <div class="col mid">
-    <section class="tile fill" id="brainTile"><span class="studs"><i></i><i></i><i></i><i></i></span>
-      <h3>Brain <small id="bInfo">111 inputs · 32 neurons · 46 answers</small></h3>
-      <div id="brainBox"><canvas id="brain"></canvas></div>
-      <div class="strip" id="senses">
-        <div><div class="row"><span>Its HP</span><span id="sHpT" class="k">—</span></div><div class="gauge"><i id="sHp"></i></div></div>
-        <div><div class="row"><span>Owner's HP</span><span id="sOhT" class="k">—</span></div><div class="gauge"><i id="sOh"></i></div></div>
-        <div><div class="row"><span>Large</span><span id="sLg" class="k">none</span></div><div class="gauge"><i id="sLgB" class="red"></i></div></div>
-        <div><div class="row"><span>Small</span><span id="sSm" class="k">none</span></div><div class="gauge"><i id="sSmB" class="amb"></i></div></div>
-        <div><div class="row"><span>Owner is</span></div><span id="sOw" class="chip">—</span></div>
+  <!-- ============================== LIVE ============================== -->
+  <main id="v-live" class="view">
+    <section class="card" id="hero">
+      <div class="heroL">
+        <div class="lbl">Latest choice<span class="r num" id="hWhen"></span></div>
+        <div id="hEmpty" class="empty">Waiting for the game to offer a choice</div>
+        <div id="hBody" hidden>
+          <span class="kind" id="hKind"><i class="dot"></i><span></span></span>
+          <div id="hWhat"></div>
+          <div id="hWhy"></div>
+        </div>
       </div>
-      <div class="legend"><span><b style="color:var(--amber)">◆</b> positive</span><span><b style="color:var(--blue)">◆</b> negative</span>
-        <span><b style="color:var(--leather)">┅</b> instinct · the game's own cat</span><span><b style="color:var(--yellow)">━</b> moved by its last lesson</span>
-        <span><b style="color:var(--green2)">▣</b> its answer</span><span class="grow"></span><span>drag turns · wheel zooms · double-click resets</span></div>
+      <div class="odds" id="hOdds"></div>
     </section>
-    <section class="tile" id="experience"><span class="studs"><i></i><i></i><i></i><i></i></span>
-      <h3>Experience <small id="lesson"></small></h3>
-      <div class="tabs"><button id="xH" class="on">Habits</button><button id="xM">Mistakes</button><button id="xD">Diary</button>
-        <button id="xQ">Quests</button><span class="pager"><button id="pgPrev" title="newer">‹</button><span id="pgInfo"></span>
-        <button id="pgNext" title="older">›</button></span></div>
-      <div id="xBody" class="muted">—</div>
-    </section>
-  </div>
 
-  <div class="col right">
-    <section class="tile" id="decision"><span class="studs"><i></i><i></i><i></i><i></i></span>
-      <h3>Decision</h3>
-      <div id="dEmpty" class="muted">Waiting for the game's first proposal…</div>
-      <div id="dBody" hidden>
-        <div class="arrow">The game proposes</div><div class="big" id="dProp">—</div>
-        <div class="arrow" id="dWhoL">It does</div><div class="big" id="dAns" style="color:var(--yellow)">—</div>
-        <div class="opts" id="dOpts"></div>
-        <div class="muted" style="font-size:11px;margin-top:6px" id="dSit"></div>
+    <section class="card" id="ctl">
+      <div>
+        <div class="lbl">Control</div>
+        <div class="state"><i class="dot" id="cDot"></i><span id="cWho">Connecting…</span></div>
+        <div id="cSub"></div>
+      </div>
+      <button id="attach" disabled>Let it decide</button>
+    </section>
+
+    <section class="card" id="time">
+      <div class="lbl">Moments
+        <span class="legend r"><span class="k-own"><i class="dot"></i>its own</span><span class="k-agreed"><i class="dot"></i>agreed</span>
+          <span class="k-game"><i class="dot"></i>game</span><span class="k-reflex"><i class="dot"></i>reflex</span></span></div>
+      <svg id="tl" preserveAspectRatio="none" aria-label="The recent moments on a timeline"></svg>
+    </section>
+
+    <section class="card" id="ring">
+      <div class="lbl">Who decided<span class="r" id="rWhen"></span></div>
+      <div class="ringBox"><svg id="ringSvg" viewBox="0 0 100 100"></svg><div class="rl" id="rLegend"></div></div>
+    </section>
+
+    <section class="card" id="brain">
+      <div class="lbl">Inside its head<span class="r legend"><span><i class="dot" style="--k:var(--warm)"></i>pushes for</span><span><i class="dot" style="--k:var(--cool)"></i>pushes against</span>
+        <span><i class="dot" style="--k:var(--accent)"></i>game's suggestion</span></span></div>
+      <canvas id="b3" title="Drag to turn · wheel to zoom · double-click to reset" aria-label="The whole brain: 129 inputs, 32 neurons, 46 answers"></canvas>
+    </section>
+
+    <section class="card" id="senses">
+      <div class="lbl">What it senses</div>
+      <div class="meters">
+        <div class="meter"><div class="row"><span>Its HP</span><b class="num" id="sHpT">—</b></div><div class="track"><i id="sHp"></i></div></div>
+        <div class="meter"><div class="row"><span>Your HP</span><b class="num" id="sOhT">—</b></div><div class="track"><i id="sOh"></i></div></div>
+        <div class="meter"><div class="row"><span>Monsters</span><b id="sMon">—</b></div><div class="track"><i id="sMonB" style="background:var(--bad)"></i></div></div>
+        <div class="meter"><div class="row"><span>You</span><b id="sOw">—</b></div><div class="track"><i id="sOwB" style="background:var(--game)"></i></div></div>
+      </div>
+      <div class="lesson" id="lesson" title="After its own choices it compares how things went with what it usually gets: better, it leans towards what it did; worse, away from it"></div>
+    </section>
+  </main>
+
+  <!-- ============================== LIFE ============================== -->
+  <main id="v-life" class="view" hidden>
+    <section class="card" id="who">
+      <div id="iEmpty" class="empty" hidden>No brain here yet. Open Home to give one to your next comrade.</div>
+      <div id="iBox" style="display:flex;flex-direction:column;flex:1;min-height:0">
+        <h1><span class="sw" id="iSw"></span><span id="iName">—</span></h1>
+        <div id="iPers"></div>
+        <div class="kpis" id="iKpis"></div>
+        <div class="sec">What matters to it</div>
+        <svg id="radar" viewBox="0 0 320 200" preserveAspectRatio="xMidYMid meet" aria-label="Its tastes"></svg>
       </div>
     </section>
-    <section class="tile" id="owner"><span class="studs"><i></i><i></i><i></i><i></i></span>
-      <h3>Its owner <small>30 s · 3 min</small></h3>
-      <div class="prof" id="sStyle"><span class="muted">No game running.</span></div>
+    <section class="card">
+      <div class="tabs" role="tablist"><button data-x="habits" class="on">Habits</button><button data-x="diary">Diary</button>
+        <button data-x="quests">Quests</button><button data-x="body">Growth</button>
+        <span class="pager" id="pager"><button id="pgPrev" aria-label="Newer">‹</button><span class="num" id="pgInfo"></span><button id="pgNext" aria-label="Older">›</button></span></div>
+      <div class="list" id="xBox"><div id="xBody"></div></div>
     </section>
-    <section class="tile fill" id="timeline"><span class="studs"><i></i><i></i><i></i><i></i></span>
-      <h3>Timeline</h3>
-      <div class="tl" id="tl"><span class="muted">—</span></div>
-    </section>
-  </div>
-</main>
+  </main>
+</div>
 
-<div id="tip"></div>
-
-<aside id="dNew" class="drawer tile"><span class="studs"><i></i><i></i><i></i><i></i></span>
-  <h3>New brain</h3><button class="x" id="closeNew">✕</button>
-  <div id="full" hidden>
-    <p class="big" style="font-size:14px">One cat per home</p>
-    <p id="fullWhy" class="muted"></p>
-    <p class="muted" style="font-size:11.5px">The home is the C3: one brain in its memory. Releasing archives the cat's passport,
-      brain and memories in the home - nothing is deleted, and it can be brought back later.</p>
-    <form id="fR" autocomplete="off"><label class="f">Type <b id="relName" style="color:var(--text)"></b> to release it
-      <input name="confirm" required></label>
-      <button type="submit">Release</button><div class="msg" id="mR"></div></form>
-  </div>
-  <div id="newTabs" class="tabs"><button id="tC" class="on">New brain</button><button id="tB">Bring back</button></div>
-  <form id="fC" autocomplete="off">
-    <p class="muted" style="font-size:12px">A brain for a comrade of the game, as it is: its name, temperament, coat,
-      skills, level and training stay the game's (hire and train it at the Comrade Board). Press the button, then take
-      the comrade you want on a quest: it receives the brain there - from then on the brain rides only that cat.</p>
-    <p id="nWait" class="big" style="font-size:13px" hidden>Waiting: the comrade you take on your next quest receives it.</p>
-    <button class="go" type="submit" id="nGo">Give a brain to my next comrade</button>
-    <button type="button" id="nCancel" hidden>Cancel</button><div class="msg" id="mC"></div>
-    <div class="muted" style="font-size:11.5px">It is born a novice: on day one it does what the game's cat would do. Its habits come from playing with you.</div>
-  </form>
-  <div id="fB" hidden><div id="bList"></div><div class="msg" id="mB"></div>
-    <div class="muted" style="font-size:11.5px">A released cat comes back as it left: its brain, habits, diary and quests.</div></div>
-</aside>
+<div id="tip" role="tooltip"></div>
+<div id="toast"></div>
+<div id="home" hidden role="dialog" aria-modal="true" aria-labelledby="homeTitle">
+  <section class="card">
+    <div style="display:flex;align-items:center"><h2 id="homeTitle">Home</h2><span class="grow"></span><button class="ghost" id="closeHome" aria-label="Close">✕</button></div>
+    <div class="t2">One brain per home. It rides a real comrade of the game, as it is.</div>
+    <div id="hFull" hidden>
+      <form id="fR" autocomplete="off"><label class="f">Type <b id="relName" style="color:var(--t1)"></b> to release it. It is archived and can come back.
+        <input name="confirm" required></label><button type="submit" class="danger">Release</button><div class="msg" id="mR"></div></form>
+    </div>
+    <div id="hEmpty" hidden>
+      <form id="fC" autocomplete="off">
+        <div id="nWait" hidden><b>A brain is waiting.</b> The comrade you take on your next quest receives it.</div>
+        <button type="submit" id="nGo" style="background:#16a843;color:#fff">Give a brain to my next comrade</button>
+        <button type="button" id="nCancel" hidden>Cancel</button><div class="msg" id="mC"></div>
+      </form>
+      <div id="bList"></div><div class="msg" id="mB"></div>
+    </div>
+  </section>
+</div>
 
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const pct = x => `${Math.round(x * 100)}%`;
-const mins = s => { s = Math.round(s); return s >= 60 ? `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s` : `${s}s`; };
+const clamp01 = x => Math.max(0, Math.min(1, x || 0));
+const clock = s => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+const dur = s => { s = Math.round(s || 0); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
+  return h ? `${h}h ${String(m).padStart(2, '0')}m` : m ? `${m}m ${String(s % 60).padStart(2, '0')}s` : `${s}s`; };
+const cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+const short = (s, n) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const ls = {get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
             set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} }};
 async function api(path, body) {
   const r = await fetch(path, body ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)} : {});
-  const j = await r.json(); if (!r.ok) throw new Error(j.error || r.statusText); return j;
+  let j = {}; try { j = await r.json(); } catch (e) {}
+  if (!r.ok) throw new Error(j.error || (r.status === 503 ? 'the home is busy, try again in a moment' : r.statusText));
+  return j;
 }
-let META = null, CAT = null, NET = null, LIVE = null, STATUS = null;
-const beh = id => { const b = META && META.behaviours[String(id)];
-  return b ? b.name + (String(b.status).startsWith('VERIFIED') ? '' : ' (?)') : `behaviour ${id}`; };
-const cap = s => s.charAt(0).toUpperCase() + s.slice(1);
-// a swatch for each of the game's coat names (an approximation by name: the game's textures are not used)
-const COAT_RGB = {Felyne:'#c9b48a','Tea Felyne':'#a8783e',Lemon:'#e8d26a',Grape:'#7d5a9a',Muscot:'#9cba6a',Melynx:'#3a3a3e',
-  'Blk Melynx':'#1e1e22','Ylw Melynx':'#cbb04a',Moody:'#8a8f98',Secret:'#5a6f7a','Short Hair':'#b8a888','Tea Tiger':'#a8783e',
-  'Ylw Tiger':'#d9b43a','Ash Tiger':'#8e8e88',SilverTigr:'#c8c8cc',FreshTiger:'#8fc06a','Red Tiger':'#b8503a',White:'#eeeeea',
-  Black:'#202024','Deep Blue':'#24407a',Pink:'#e89ab0',Blue:'#5a8fd0',Tea:'#9a6a3a',Brown:'#6a4a2a',Peppermint:'#8fd8b8',
-  Gold:'#d8b030','Blk & Wht':'#808080','Tea Spots':'#a8783e','Blue Spots':'#5a8fd0','Red Spots':'#b8503a',Purple:'#7a4a9a',
-  'Deep Sea':'#1f5a6a',Orange:'#e0802a','Jet Black':'#0e0e10'};
+function toast(t) { const e = $('toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => e.style.display = 'none', 4000); }
+let META = null, CAT = null, NET = null, STATUS = null, LIVE = null, HOME = {waiting: false}, VIEW = 'live', attachErr = null;
 
-/* ============================== the 3D brain tile (a tiny renderer, no library) ============================== */
-const cv = $('brain'), g = cv.getContext('2d'), box = $('brainBox');
-let W = 0, H = 0, DPR = 1;
-const VIEW = {yaw: -0.5, pitch: 0.12};               // the walls seen a little from the side
-const LAYER_X = 320, RING_R = 128;
-const cam = {yaw: VIEW.yaw, pitch: VIEW.pitch, drag: null, fit: null, user: 1};
-const nodes = [];
-let edges = [], changed = new Set(), instinct = null, chosen = null, allowed = new Set(), probs = {}, dirty = true;
-
-function resize() {
-  const r = box.getBoundingClientRect(); DPR = Math.min(2, window.devicePixelRatio || 1); W = r.width; H = r.height;
-  cv.width = W * DPR; cv.height = H * DPR; g.setTransform(DPR, 0, 0, DPR, 0, 0);
-  cam.fit = null; dirty = true;                    // the framing is measured again on the default view (fitView)
+/* ------------------------------------------------------------ the game's words */
+const beh = k => { const b = META && META.behaviours[String(k)]; return b ? b.name : `behaviour ${k}`; };
+const isChoice = k => { const b = META && META.behaviours[String(k)]; return !!b && /^(CHOICE|SUPPORT|COMBAT)/.test(b.category); };
+const B_SHORT = {0: 'Dig and heal', 1: 'Gather', 2: 'Lie down', 3: 'Horn', 4: 'Health Flute', 5: 'True Health Flute', 6: 'Demon Flute',
+  7: 'Armor Flute', 8: 'Shock Trap', 9: 'Antidote Flute', 10: 'Sleep', 11: 'Victory dance', 12: 'Defeated', 13: 'Watch you cook',
+  14: 'Watch you fish', 15: 'Charge', 16: 'Evade', 17: 'Follow you', 18: 'Hop underground', 19: 'Step down', 20: 'Sneak', 21: 'Relocate',
+  22: 'Dig to you', 23: 'Drop down', 24: 'Ledge', 25: 'Attack', 26: 'Jump attack', 27: 'Small bomb', 28: 'Large bomb', 29: 'Wake you',
+  30: 'Pushed back', 31: 'Thrown', 32: 'Knocked down', 33: 'Pushed', 34: 'Paralysed', 35: 'Asleep', 36: 'Stunned', 37: 'Wind',
+  38: 'Wind', 39: 'Hit', 40: 'Ducks', 41: 'Roar', 42: 'Roar', 43: 'Roar', 44: 'Roar', 45: 'Knocked out'};
+const bs = k => B_SHORT[k] || cap(beh(k));
+function kindOf(d) {                       // every moment is one of these, one colour each
+  if (!isChoice(d.proposed)) return 'reflex';
+  const n = d.probabilities ? Object.keys(d.probabilities).length : 0;
+  if (d.by === 'brain') return n === 1 ? 'only' : d.chose !== d.proposed ? 'own' : 'agreed';
+  return 'game';
 }
-new ResizeObserver(resize).observe(box);
-
-function buildNet(s) {
-  // a partial answer (the C3 short of memory mid-quest, 5 Oct) must never blank the view: check BEFORE clearing it
-  if (!s || !Array.isArray(s.layers) || s.layers.length !== 3 || !Array.isArray(s.layers[0].names) || !Array.isArray(s.edges))
-    throw new Error('incomplete brain answer');
-  nodes.length = 0;
-  const L = s.layers, names = L[0].names, nIn = L[0].size, nH = L[1].size, nOut = L[2].size;
-  // Three parallel layers of about the same height, side by side (owner, 5 Oct: inputs and outputs looked lopsided):
-  //   INPUTS  x = -LAYER_X: a wall of three blocks stacked - what it senses / the game's proposal / the owner
-  //   NEURONS x = 0: a ring
-  //   ANSWERS x = +LAYER_X: a grid, 6 wide and 8 high
-  // Each wall stands in the y-z plane, centred on y = z = 0; the default view looks at them a little from the side.
-  const COLS = 8, SY = 16, SZ = 18, GAP = 1.7;             // the input wall: 8 wide, blocks stacked with a gap
-  const groups = [[0, 59], [59, 105], [105, nIn]].map(([a, b]) => ({a, b, rows: Math.ceil((b - a) / COLS)}));
-  const height = groups.reduce((h, g2) => h + g2.rows, 0) + GAP * (groups.length - 1);
-  let row0 = -(height - 1) / 2;
-  groups.forEach((g2, k) => {
-    for (let i = g2.a; i < g2.b; i++) {
-      const j = i - g2.a, c = j % COLS, r = Math.floor(j / COLS);
-      nodes.push({layer: 0, i, x: -LAYER_X, y: -(row0 + r) * SY, z: (c - (COLS - 1) / 2) * SZ, a: 0, t: 0, name: names[i], group: k});
-    }
-    row0 += g2.rows + GAP;
-  });
-  for (let i = 0; i < nH; i++) { const th = (i / nH) * Math.PI * 2;
-    nodes.push({layer: 1, i, x: 0, y: Math.cos(th) * RING_R, z: Math.sin(th) * RING_R, a: 0, t: 0, name: `neuron ${i + 1}`}); }
-  const OC = 6, OR = Math.ceil(nOut / OC), OY = 37, OZ = 30;   // the answers: 6 wide, 8 high
-  for (let i = 0; i < nOut; i++) { const r = Math.floor(i / OC), inRow = r === OR - 1 ? nOut - r * OC : OC, c = i % OC;
-    nodes.push({layer: 2, i, x: LAYER_X, y: ((OR - 1) / 2 - r) * OY, z: (c - (inRow - 1) / 2) * OZ, a: 0, t: 0, name: `answer: ${beh(i)}`}); }
-  // the network turns around its OWN centre (owner, 5 Oct: turning must not swing it around or zoom it)
-  let lo = [1e9, 1e9, 1e9], hi = [-1e9, -1e9, -1e9];
-  for (const n of nodes) [n.x, n.y, n.z].forEach((v, k) => { lo[k] = Math.min(lo[k], v); hi[k] = Math.max(hi[k], v); });
-  const mid = lo.map((v, k) => (v + hi[k]) / 2);
-  SCENE_R = 1;
-  for (const n of nodes) { n.x -= mid[0]; n.y -= mid[1]; n.z -= mid[2]; SCENE_R = Math.max(SCENE_R, Math.hypot(n.x, n.y, n.z)); }
-  cam.fit = null;
-  const base = [0, nIn, nIn + nH];
-  edges = [];
-  s.edges[0].forEach(([i, j, w]) => edges.push({s: base[0] + i, d: base[1] + j, w, layer: 0}));
-  s.edges[1].forEach(([i, j, w]) => edges.push({s: base[1] + i, d: base[2] + j, w, layer: 1}));
-  const mx = [0, 0]; edges.forEach(e => mx[e.layer] = Math.max(mx[e.layer], Math.abs(e.w)));
-  edges.forEach(e => e.n = mx[e.layer] ? Math.abs(e.w) / mx[e.layer] : 0);
-  changed = new Set((s.changed || []).map(([j, i]) => `${base[1] + i}>${base[2] + j}`));
-  renderTastes(s.tastes, s.last_feeling);
-  NET = {s, base}; $('bInfo').textContent = `${nIn} inputs · ${nH} neurons · ${nOut} answers · ${s.step} lessons`; dirty = true;
+const KIND = {own: 'Its own choice', agreed: 'Agreed with the game', game: "The game's cat", reflex: 'Reflex', only: 'No alternative'};
+const HACT = {idle: 'standing still', walk: 'walking', run: 'running', bump: 'bumping', crouch: 'crouching', stand_up: 'standing up',
+  crouch_walk: 'sneaking', crawl: 'crawling', bed: 'in bed', gather: 'gathering', carve: 'carving', eat_drink: 'eating',
+  bbq: 'cooking', fish: 'fishing', drawn: 'weapon out', weapon: 'attacking', hit: 'hit', other: 'busy'};
+const STYLE = {calm: 'calm', attacks: 'attacking a lot', gets_hit: 'getting hit a lot', heals: 'healing often',
+  gathers: 'gathering a lot', crouches: 'sneaking a lot', runs: 'running a lot'};
+const PROFW = {attacks: 'attacking', hits_landed: 'landing hits', hits_taken: 'getting hit', heals_at_hp: 'healing', low_hp: 'low on HP',
+  gathers: 'gathering', runs: 'running', distance: 'far away', fights_alone: 'fighting alone'};
+function situation(c) {                    // "large|ok|moves|runs" in words
+  const [mon, hp, who, style] = String(c || '').split('|');
+  const M = {large: 'large monster close', small: 'small monsters close', zone: 'monsters around', none: 'no monsters'};
+  const W = {fights: 'you fighting', rests: 'you still', moves: 'you moving', works: 'you gathering', other: 'you busy'};
+  return [M[mon] || mon, hp === 'low' ? 'its HP low' : '', W[who] || who, style && style !== 'calm' ? `you ${STYLE[style] || style}` : '']
+    .filter(Boolean).join(' · ');
 }
-// Framing (owner, 5 Oct: "ruotando si zoomma involontariamente ... tipo lente"): the scale is measured ONCE, on the
-// default view, inside the tile's label margins, and then stays fixed while turning - only the wheel zooms (cam.user),
-// a double-click resets. The perspective is mild (the camera PERSP scene radii away): no wide-angle 'lens'.
-let SCENE_R = 400;
-const PERSP = 7;
-function rotated(n, yaw, pitch) {
+const TRAINING = {1: 'Hand to Hand', 2: 'Dumbbells', 3: 'Sit-ups', 4: 'Forms', 5: 'Meditation', 6: 'Rest'};
+const COAT_RGB = {Felyne: '#c9b48a', 'Tea Felyne': '#a8783e', Lemon: '#e8d26a', Grape: '#7d5a9a', Muscot: '#9cba6a', Melynx: '#3a3a3e',
+  'Blk Melynx': '#1e1e22', 'Ylw Melynx': '#cbb04a', Moody: '#8a8f98', Secret: '#5a6f7a', 'Short Hair': '#b8a888', 'Tea Tiger': '#a8783e',
+  'Ylw Tiger': '#d9b43a', 'Ash Tiger': '#8e8e88', SilverTigr: '#c8c8cc', FreshTiger: '#8fc06a', 'Red Tiger': '#b8503a', White: '#eeeeea',
+  Black: '#202024', 'Deep Blue': '#24407a', Pink: '#e89ab0', Blue: '#5a8fd0', Tea: '#9a6a3a', Brown: '#6a4a2a', Peppermint: '#8fd8b8',
+  Gold: '#d8b030', 'Blk & Wht': '#808080', 'Tea Spots': '#a8783e', 'Blue Spots': '#5a8fd0', 'Red Spots': '#b8503a', Purple: '#7a4a9a',
+  'Deep Sea': '#1f5a6a', Orange: '#e0802a', 'Jet Black': '#0e0e10'};
+const coatOf = p => p && p.coat !== null && p.coat !== undefined ? META.coats[p.coat] : null;
+const coatCol = () => COAT_RGB[coatOf(CAT && CAT.passport)] || '#6c6b66';
+const lastBody = p => p && p.body_history && p.body_history.length ? p.body_history[p.body_history.length - 1] : null;
+const catName = () => CAT ? CAT.passport.name : (LIVE && LIVE.cat) || 'your comrade';
+const el = (tag, a, inner = '') => `<${tag} ${Object.entries(a).map(([k, v]) => `${k}="${v}"`).join(' ')}>${inner}</${tag}>`;
+
+/* ------------------------------------------------------------ views */
+function show(v) {
+  VIEW = v; ls.set('otomo.view', v);
+  document.querySelectorAll('nav button').forEach(b => { const on = b.dataset.v === v; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+  $('v-live').hidden = v !== 'live'; $('v-life').hidden = v !== 'life';
+  renderAll();
+}
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => show(b.dataset.v));
+
+/* ------------------------------------------------------------ control: who decides, and the one button */
+function renderControl() {
+  const s = STATUS, live = s && s.live, N = catName(), mine = !!(live && CAT && live.passport === CAT.passport.id);
+  let k = 'reflex', who, sub = '';
+  if (!CAT) { who = HOME.waiting ? 'A brain is waiting' : 'No brain here yet'; sub = HOME.waiting ? 'Take a comrade on a quest' : 'Open Home to start'; }
+  else if (!LIVE) { who = `${N} is resting`; sub = 'No quest running'; }
+  else if (!live.brain_alive) { k = 'bad'; who = `${N}'s brain stopped`; sub = "The game's cat took over"; }
+  else if (live.attached) { k = 'own'; who = `${N} decides`; sub = `In control for ${dur(live.attached_s)}`; }
+  else { k = 'game'; who = 'The game decides'; sub = `${N} is watching`; }
+  const err = attachErr && Date.now() - attachErr.at < 10000;
+  $('ctl').className = `card k-${k}${k === 'own' ? ' on' : ''}`;
+  $('cDot').style.background = k === 'bad' ? 'var(--bad)' : '';
+  $('cWho').textContent = who; $('cSub').textContent = err ? attachErr.text : sub; $('cSub').classList.toggle('err', !!err);
+  const btn = $('attach'), on = !!(s && s.wants_attached) || !!(LIVE && live.attached);
+  btn.hidden = !CAT;
+  btn.textContent = on ? 'Give control back' : `Let ${N} decide`;
+  btn.className = on ? '' : 'primary';
+  btn.disabled = !(on || (LIVE && mine && live.brain_alive));
+  btn.title = btn.disabled && !LIVE ? 'Start a quest first' : '';
+}
+$('attach').onclick = async () => {
+  const want = !(STATUS && (STATUS.wants_attached || (LIVE && LIVE.attached))); $('attach').disabled = true; attachErr = null;
+  try { STATUS = await api('/api/attach', {instance: +$('instSel').value, attached: want}); }
+  catch (e) { attachErr = {text: cap(e.message), at: Date.now()}; }
+  renderStatus();
+};
+
+/* ------------------------------------------------------------ the latest choice (the primary element) */
+function renderHero(decs) {
+  const N = catName(), d = decs.find(x => isChoice(x.proposed)) || decs[0];
+  $('hEmpty').hidden = !!d; $('hBody').hidden = !d;
+  if (!d) { $('hWhen').textContent = ''; $('hOdds').innerHTML = ''; return; }
+  const k = kindOf(d);
+  $('hero').className = `card k-${k}`;
+  $('hKind').lastChild.textContent = k === 'own' || k === 'agreed' ? `${N} · ${KIND[k].toLowerCase()}` : KIND[k];
+  $('hWhen').textContent = `${clock(d.t)}${LIVE ? '' : ' · last quest'}`;
+  $('hWhat').textContent = bs(d.chose); $('hWhat').title = cap(beh(d.chose));
+  $('hWhy').innerHTML = k === 'own' ? `The game suggested <b>${esc(bs(d.proposed))}</b>` : k === 'agreed' ? 'The same as the game suggested'
+    : k === 'game' ? `${esc(N)} was not in control` : k === 'only' ? 'The game allowed nothing else' : 'The game handles these by itself';
+  // its odds; for the game's cat, what the brain would have done on that same suggestion (live)
+  const b = LIVE && LIVE.brain, would = k === 'game' && b && b.proposal === d.proposed;
+  const probs = would ? b.probabilities : d.probabilities;
+  const list = probs ? Object.entries(probs).map(([a, p]) => [+a, p]).sort((x, y) => y[1] - x[1]).slice(0, 3) : [];
+  $('hOdds').innerHTML = list.length < 2 ? '' : (would ? `<div class="lbl" style="margin:0">${esc(N)} would have chosen</div>` : '') + list.map(([a, p]) => {
+    const pick = would ? a === list[0][0] : a === d.chose;
+    return `<div class="odd${pick ? ' pick' : ''}" title="${esc(cap(beh(a)))}"><div class="row"><span>${esc(bs(a))}${a === d.proposed ? '<small>game</small>' : ''}</span><span class="num">${pct(p)}</span></div>
+      <div class="track"><i style="width:${pct(p)}"></i></div></div>`; }).join('');
+}
+
+/* ------------------------------------------------------------ the moments: a timeline (x = quest time, height = how much it was its own) */
+const H_OF = {own: 1, agreed: .72, game: .5, only: .3, reflex: .3};
+function renderTimeline(decs) {
+  const svg = $('tl'), W = svg.clientWidth || 600, H = svg.clientHeight || 90;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  if (!decs.length) { svg.innerHTML = el('text', {x: W / 2, y: H / 2, fill: css('--t3'), 'font-size': 13, 'text-anchor': 'middle'}, 'No moments yet'); return; }
+  const t1 = decs[0].t, t0 = Math.min(decs[decs.length - 1].t, t1 - 30), span = Math.max(30, t1 - t0), base = H - 20, top = 4, pad = 6;
+  const X = t => pad + (W - 2 * pad) * (t - t0) / span;
+  let out = el('line', {x1: 0, y1: base + .5, x2: W, y2: base + .5, stroke: css('--s3')});
+  decs.slice().reverse().forEach(d => { const k = kindOf(d), h = (base - top) * H_OF[k], x = X(d.t);
+    out += el('rect', {x: (x - 3).toFixed(1), y: (base - h).toFixed(1), width: 6, height: h.toFixed(1), rx: 1, fill: css(`--${k === 'only' ? 'reflex' : k}`),
+      'data-tip': esc(`<b>${esc(bs(d.chose))}</b> · ${clock(d.t)}<br>${KIND[k]}${k === 'own' ? ` (the game said ${esc(bs(d.proposed))})` : ''}`)}); });
+  out += el('text', {x: pad, y: H - 4, fill: css('--t3'), 'font-size': 11}, clock(t0)) + el('text', {x: W - pad, y: H - 4, fill: css('--t3'), 'font-size': 11, 'text-anchor': 'end'}, clock(t1));
+  svg.innerHTML = out;
+}
+
+/* ------------------------------------------------------------ who decided: a ring */
+function renderRing(decs) {
+  const n = {own: 0, agreed: 0, game: 0, reflex: 0};
+  decs.forEach(d => { const k = kindOf(d); n[k === 'only' ? 'reflex' : k]++; });
+  const total = decs.length, choices = n.own + n.agreed + n.game, mine = n.own + n.agreed;
+  $('rWhen').textContent = total ? `last ${total}` : '';
+  const R = 40, C = 2 * Math.PI * R;
+  let off = 0, arcs = el('circle', {cx: 50, cy: 50, r: R, fill: 'none', stroke: css('--s3'), 'stroke-width': 10});
+  if (total) for (const k of ['own', 'agreed', 'game', 'reflex']) { if (!n[k]) continue; const len = C * n[k] / total;
+    arcs += el('circle', {cx: 50, cy: 50, r: R, fill: 'none', stroke: css(`--${k}`), 'stroke-width': 10, 'stroke-dasharray': `${Math.max(0, len - 1.5).toFixed(2)} ${C.toFixed(2)}`,
+      'stroke-dashoffset': (-off).toFixed(2), transform: 'rotate(-90 50 50)'}); off += len; }
+  arcs += el('text', {x: 50, y: 52, fill: css('--t1'), 'font-size': 20, 'font-weight': 700, 'text-anchor': 'middle'}, choices ? pct(mine / choices) : '—');
+  arcs += el('text', {x: 50, y: 66, fill: css('--t3'), 'font-size': 9, 'text-anchor': 'middle'}, `by ${esc(short(catName(), 10))}`);
+  $('ringSvg').innerHTML = arcs;
+  $('rLegend').innerHTML = [['own', 'Its own'], ['agreed', 'Agreed'], ['game', 'Game'], ['reflex', 'Reflex']]
+    .map(([k, t]) => `<i class="dot k-${k}"></i><span>${t}</span><b class="num">${n[k]}</b>`).join('');
+}
+
+/* ------------------------------------------------------------ what it senses */
+function idx(name) { return NET ? NET.names.indexOf(name) : -1; }
+function renderSenses() {
+  const b = LIVE && LIVE.brain, v = name => { const i = idx(name); return b && i >= 0 ? b.inputs[i] : null; };
+  const g = (id, x, cls) => { $(id).style.width = pct(clamp01(x)); if (cls !== undefined) $(id).className = cls; };
+  const hpc = x => x < .3 ? 'low' : x < .6 ? 'mid' : 'hp', far = d => d < .1 ? 'close' : d < .3 ? 'near' : 'far';
+  const hp = v('cat HP'), oh = v('owner HP');
+  $('sHpT').textContent = hp === null ? '—' : pct(hp); g('sHp', hp, hpc(hp));
+  $('sOhT').textContent = oh === null ? '—' : pct(Math.min(1, oh)); g('sOh', oh, hpc(oh));
+  const lc = v('large monsters'), ld = v('nearest large: distance'), la = v('nearest large: attacking'), sc = v('small monsters'), sd = v('nearest small: distance');
+  $('sMon').textContent = !b ? '—' : lc ? `Large, ${la ? 'attacking' : far(ld)}` : sc ? `${Math.round(sc)} small, ${far(sd)}` : 'None';
+  g('sMonB', lc ? 1 - ld : sc ? 1 - sd : 0);
+  const act = LIVE && LIVE.hunter, od = v('owner distance');
+  $('sOw').textContent = act ? cap(HACT[act] || act) : '—'; g('sOwB', b ? 1 - (od || 0) : 0);
+  const lf = (b && b.last_feeling) || (NET && NET.last_feeling), step = (b && b.step) || (NET && NET.step) || 0;
+  const up = lf && lf.feeling > .15, down = lf && lf.feeling < -.15;
+  $('lesson').innerHTML = !lf ? '<span>No lesson yet</span>' : `<span>Last lesson</span><b style="color:${up ? 'var(--own)' : down ? 'var(--bad)' : 'var(--t1)'}">${
+    up ? 'better than usual' : down ? 'worse than usual' : 'as usual'}</b><span class="grow"></span><span class="t3 num">${step} lessons</span>`;
+}
+
+/* ------------------------------------------------------------ inside its head: only the current decision, flat */
+const SENSE = {'cat HP': 'Its HP', 'cat KO': 'It is knocked out', 'cat level': 'Its level', 'cat hearts': 'Its fondness',
+  'cat attack type (slash)': 'It slashes', 'weapon share': 'Its weapon share', 'healing threshold': 'When it heals',
+  'large-monster preference': 'Likes large monsters', 'evade large attacks': 'Evades large attacks', 'cat paralysed': 'It is paralysed',
+  'cat asleep': 'It is asleep', 'cat stunned': 'It is stunned', 'owner in the same zone': 'You are near', 'owner distance': 'How far you are',
+  'owner HP': 'Your HP', 'owner poisoned': 'You are poisoned', 'owner attack up': 'Your attack is up', 'owner defence up': 'Your defence is up',
+  'large monsters': 'Large monsters', 'nearest large: distance': 'Large monster distance', 'nearest large: attacking': 'Large monster attacking',
+  'small monsters': 'Small monsters', 'nearest small: distance': 'Small monster distance', 'nearest small: attacking': 'Small monster attacking'};
+const DOING = {choice: 'free', support: 'supporting', combat: 'fighting', context: 'in a scene', terrain: 'on terrain', move: 'moving', reaction: 'hit'};
+function senseLabel(n) {
+  if (SENSE[n]) return SENSE[n];
+  let m;
+  if ((m = n.match(/^skill: (.*)/))) return `Skill: ${m[1]}`;
+  if ((m = n.match(/^cat doing: (.*)/))) return `It is ${DOING[m[1]] || m[1]}`;
+  if ((m = n.match(/^owner: (.*)/))) return `You are ${HACT[m[1]] || m[1]}`;
+  if ((m = n.match(/^owner style: (.*)/))) return `You: ${STYLE[m[1]] || m[1]}`;
+  if ((m = n.match(/^owner (\w+) \((30|180) s\)$/))) return `You ${PROFW[m[1]] || m[1]} (${m[2] === '30' ? '30 s' : '3 min'})`;
+  return n;
+}
+addEventListener('pointermove', e => {
+  if (e.target.id === 'b3') return;                       // the 3D view shows its own tips
+  const t = e.target.closest && e.target.closest('[data-tip]'), tip = $('tip');
+  if (!t) { tip.style.display = 'none'; return; }
+  tip.innerHTML = t.getAttribute('data-tip'); tip.style.display = 'block';
+  tip.style.left = Math.min(innerWidth - 290, e.clientX + 14) + 'px'; tip.style.top = Math.min(innerHeight - tip.offsetHeight - 8, e.clientY + 16) + 'px';
+});
+
+/* ------------------------------------------------------------ inside its head: the whole brain in 3D, small, in its block
+   Three walls side by side, the real network: INPUTS (129: what it senses / the game's suggestion / you), NEURONS (32,
+   a ring), ANSWERS (46). Links: the strongest 6 into each neuron and each answer (what the home sends), coloured by what
+   flows through them now. Turned only by hand (owner, 4 Oct: no spinning); the scale is fixed on the default view. */
+const B3 = {nodes: [], yaw: -.4, pitch: .32, zoom: 1, drag: null, fit: null, dirty: true, hover: null, open: false, built: 0};
+const B3_VIEW = {yaw: -.4, pitch: .32};
+const RIM = 236;                           // the answers' ring: the widest thing, so any turn fits the block
+function fib(n, r, k) {                    // the k-th of n points spread evenly on a sphere of radius r, top to bottom
+  const y = 1 - 2 * (k + .5) / n, rr = Math.sqrt(1 - y * y), th = k * Math.PI * (3 - Math.sqrt(5));
+  return {x: Math.cos(th) * rr * r, y: y * r, z: Math.sin(th) * rr * r};
+}
+function b3build() {
+  if (!NET) return;
+  const N = B3.nodes, nIn = NET.names.length; N.length = 0;
+  const gname = i => i < 59 ? 'what it senses' : i < 105 ? "the game's suggestion" : 'you';
+  for (let i = 0; i < nIn; i++) N.push({L: 0, i, g: i < 59 ? 0 : i < 105 ? 1 : 2, gname: gname(i), ...fib(nIn, 190, i)});
+  for (let j = 0; j < 32; j++) N.push({L: 1, i: j, ...fib(32, 62, j)});
+  for (let a = 0; a < 46; a++) { const th = a / 46 * Math.PI * 2; N.push({L: 2, i: a, x: Math.cos(th) * RIM, y: 0, z: Math.sin(th) * RIM}); }
+  B3.base = [0, nIn, nIn + 32]; B3.fit = null; B3.dirty = true;
+}
+function b3rot(n, yaw, pitch) {
   const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
-  const x = n.x * cy - n.z * sy, z1 = n.x * sy + n.z * cy;
-  const y = n.y * cp - z1 * sp, z = n.y * sp + z1 * cp, f = PERSP * SCENE_R / (PERSP * SCENE_R + z);
+  const x = n.x * cy - n.z * sy, z1 = n.x * sy + n.z * cy, y = n.y * cp - z1 * sp, z = n.y * sp + z1 * cp, f = 1;   // no perspective: turning never zooms
   return [x * f, -y * f, z, f];
 }
-function fitView() {                    // the default view's extent -> one fixed scale and offset
-  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
-  for (const n of nodes) { const [x, y] = rotated(n, VIEW.yaw, VIEW.pitch);
-    x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-  const L = Math.min(118, W * .2), R = W - Math.min(150, W * .24), T = H * .1, B = H * .95;   // room for labels
-  const k = Math.min((R - L) / Math.max(1, x1 - x0), (B - T) / Math.max(1, y1 - y0));
-  cam.fit = {k, cx: (L + R) / 2, cy: (T + B) / 2, ox: -k * (x0 + x1) / 2, oy: -k * (y0 + y1) / 2};
-}
-function project(n) {
-  if (!cam.fit) fitView();
-  const [x, y, z, f] = rotated(n, cam.yaw, cam.pitch), F = cam.fit, u = cam.user || 1;
-  n.px = F.cx + (x * F.k + F.ox) * u;     // the wheel zooms about the tile's centre
-  n.py = F.cy + (y * F.k + F.oy) * u;
-  n.pz = z; n.f = f * F.k * u;
-}
-const BASE = [78, 79, 86];
-function col(a, alpha) {
-  const m = Math.min(1, Math.abs(a)), [r, gg, b] = a >= 0 ? [255, 192, 74] : [58, 167, 216];
-  return `rgba(${Math.round(BASE[0] + (r - BASE[0]) * m)},${Math.round(BASE[1] + (gg - BASE[1]) * m)},${Math.round(BASE[2] + (b - BASE[2]) * m)},${alpha})`;
-}
-function gem(x, y, r, fill) {            // a small diamond with a dark rim and a light facet, like the game's HUD gems
-  g.beginPath(); g.moveTo(x, y - r); g.lineTo(x + r, y); g.lineTo(x, y + r); g.lineTo(x - r, y); g.closePath();
-  g.fillStyle = fill; g.fill(); g.lineWidth = 1; g.strokeStyle = 'rgba(8,8,10,.9)'; g.stroke();
-  g.beginPath(); g.moveTo(x, y - r * .7); g.lineTo(x + r * .45, y - r * .1); g.lineTo(x, y); g.closePath(); g.fillStyle = 'rgba(255,255,255,.22)'; g.fill();
-}
-let hover = null, anim = false;
-function draw(t) {
-  requestAnimationFrame(draw);
-  if (!NET || !W) return;
-  let moving = false;
-  for (const n of nodes) { const d = n.t - n.a; if (Math.abs(d) > .003) { n.a += d * .18; moving = true; } }
-  const pulse = changed.size > 0 || instinct !== null || chosen !== null;   // animated bits keep a gentle redraw
-  if (!dirty && !moving && !pulse) return;
-  dirty = false;
-  g.clearRect(0, 0, W, H);
-  for (const n of nodes) project(n);
-  // faint column plates
-  g.font = '600 11px "Trebuchet MS","Segoe UI",sans-serif'; g.textAlign = 'center';
-  for (const [label, ix] of [['INPUTS', 0], ['NEURONS', 1], ['ANSWERS', 2]]) {
-    const ns = nodes.filter(n => n.layer === ix), top = ns.reduce((m, n) => n.py < m.py ? n : m, ns[0]);
-    const cx = ns.reduce((s, n) => s + n.px, 0) / ns.length; g.fillStyle = 'rgba(239,226,122,.9)'; g.fillText(label, cx, Math.max(14, top.py - 22));
-  }
-  g.font = '10.5px "Trebuchet MS","Segoe UI",sans-serif'; g.fillStyle = 'rgba(163,163,155,.85)';
-  for (const [k, lab] of [[0, 'senses'], [1, 'game proposal'], [2, 'owner']]) {   // the three input blocks, named
-    const ns = nodes.filter(n => n.layer === 0 && n.group === k);
-    if (!ns.length) continue;
-    const top = ns.reduce((m, n) => n.py < m.py ? n : m, ns[0]), left = ns.reduce((m, n) => n.px < m.px ? n : m, ns[0]);
-    g.textAlign = 'left'; g.fillText(lab, left.px - 4, top.py - 9);
-  }
+function b3draw() {
+  requestAnimationFrame(b3draw);
+  if (!B3.open || !B3.dirty || !NET) return;
+  if (B3.built !== NET.names.length) { b3build(); B3.built = NET.names.length; }
+  B3.dirty = false;
+  const cv = $('b3'), g = cv.getContext('2d'), dpr = Math.min(2, devicePixelRatio || 1), W = cv.clientWidth, H = cv.clientHeight;
+  if (!W || !H) return;
+  if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); B3.fit = null; }
+  g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  if (!B3.fit) { const side = Math.min(140, W * .24);      // room for the names either side
+    B3.fit = {k: Math.min((W - 2 * side) / (2 * RIM), (H - 12) / (2 * RIM)), ox: 0, oy: 0}; }
+  const F = B3.fit, b = LIVE && LIVE.brain, C = {warm: css('--warm'), cool: css('--cool'), t1: css('--t1'), t2: css('--t2'), t3: css('--t3'),
+    s3: css('--s3'), own: css('--own'), acc: css('--accent')};
+  const act = n => !b ? 0 : n.L === 0 ? b.inputs[n.i] : n.L === 1 ? b.hidden[n.i] : 0;
+  const probs = (b && b.probabilities) || {}, top = Object.entries(probs).sort((p, q) => q[1] - p[1])[0], best = top ? +top[0] : -1;
+  for (const n of B3.nodes) { const [x, y, z] = b3rot(n, B3.yaw, B3.pitch); n.px = W / 2 + (x * F.k + F.ox) * B3.zoom; n.py = H / 2 + (y * F.k + F.oy) * B3.zoom;
+    n.pz = z; n.f = 1; n.d = .45 + .55 * (1 - (z + RIM) / (2 * RIM)); }
+  // links: what flows through them now (weight x activity); without a quest, the wiring alone, faint
+  const links = [];
+  for (const [i, j, w] of NET.e1) links.push([B3.nodes[B3.base[0] + i], B3.nodes[B3.base[1] + j], b ? w * b.inputs[i] : w, 0]);
+  for (const [j, a, w] of NET.e2) links.push([B3.nodes[B3.base[1] + j], B3.nodes[B3.base[2] + a], b ? w * b.hidden[j] : w, 1]);
+  const mx = [0, 0]; links.forEach(l => mx[l[3]] = Math.max(mx[l[3]], Math.abs(l[2])));
   g.lineCap = 'round';
-  for (const e of edges) {
-    const s = nodes[e.s], d = nodes[e.d], flow = Math.min(1, Math.abs(e.w * s.a) * (e.layer ? 1.4 : 3)), ch = changed.has(`${e.s}>${e.d}`);
-    let al = 0.06 + 0.5 * flow * (0.4 + 0.6 * e.n);
-    if (e.layer === 1 && allowed.size && !allowed.has(d.i)) al *= 0.25;
-    g.strokeStyle = ch ? `rgba(239,226,122,${0.4 + 0.4 * (0.5 + 0.5 * Math.sin(t / 260))})` : e.w >= 0 ? `rgba(255,192,74,${al})` : `rgba(58,167,216,${al})`;
-    g.lineWidth = ch ? 1.8 : 0.6 + 1.4 * flow * e.n;
-    g.beginPath(); g.moveTo(s.px, s.py); g.lineTo(d.px, d.py); g.stroke();
+  for (const [s, d, c, L] of links) { const m = mx[L] ? Math.abs(c) / mx[L] : 0;
+    const off = L === 1 && b && probs[d.i] === undefined;          // an answer the game does not allow now
+    g.globalAlpha = (b ? .05 + .55 * m : .04 + .14 * m) * (off ? .25 : 1) * (s.d + d.d) / 2;
+    g.strokeStyle = !b ? C.t3 : c > 0 ? C.warm : C.cool; g.lineWidth = (.5 + 1.8 * m) * B3.zoom;
+    g.beginPath(); g.moveTo(s.px, s.py); g.lineTo(d.px, d.py); g.stroke(); }
+  g.globalAlpha = 1;
+  // nodes, far first
+  for (const n of B3.nodes.slice().sort((p, q) => q.pz - p.pz)) {
+    let r = (n.L === 0 ? 2.6 : n.L === 1 ? 4.5 : 3.6) * n.f * B3.zoom, fill = C.t3, alpha = .4;      // quiet: the wall still reads
+    if (n.L < 2) { const a = act(n), m = Math.min(1, Math.abs(a)); if (m > .05) { fill = a > 0 ? C.warm : C.cool; alpha = .35 + .65 * m; } }
+    else if (probs[n.i] !== undefined) { const p = probs[n.i]; r *= 1 + 1.4 * Math.sqrt(p); fill = n.i === best ? C.own : C.t2; alpha = 1; }
+    else alpha = .3;
+    if (n.L === 0 && b && n.g === 1 && n.i - 59 === b.proposal) { fill = C.acc; alpha = 1; }
+    n.r = r; g.globalAlpha = alpha * n.d; g.fillStyle = fill; g.beginPath(); g.arc(n.px, n.py, r, 0, 7); g.fill();
+    if (n.L === 2 && b && n.i === b.proposal) { g.globalAlpha = 1; g.strokeStyle = C.acc; g.lineWidth = 2; g.beginPath(); g.arc(n.px, n.py, r + 3, 0, 7); g.stroke(); }
+    if (n === B3.hover) { g.globalAlpha = 1; g.strokeStyle = C.t1; g.lineWidth = 1.5; g.beginPath(); g.arc(n.px, n.py, r + 4, 0, 7); g.stroke(); }
   }
-  if (instinct !== null) {                     // the instinct: the game's proposal straight to the same answer
-    const s = nodes[NET.base[0] + 59 + instinct], d = nodes[NET.base[2] + instinct];
-    g.strokeStyle = 'rgba(184,114,47,.9)'; g.lineWidth = 2.2; g.setLineDash([7, 5]); g.lineDashOffset = -t / 50;
-    g.beginPath(); g.moveTo(s.px, s.py); g.quadraticCurveTo((s.px + d.px) / 2, Math.min(s.py, d.py) - 70, d.px, d.py); g.stroke(); g.setLineDash([]);
-  }
-  const order = nodes.slice().sort((a, b) => b.pz - a.pz);
-  for (const n of order) {
-    let r = (n.layer === 1 ? 6.5 : n.layer === 2 ? 5 : 3.8) * n.f, alpha = 1;
-    if (n.layer === 2) { const p = probs[n.i]; if (p !== undefined) r *= 1 + 1.5 * Math.sqrt(p); else if (allowed.size) alpha = .35; }
-    n.r = r;
-    const v = n.layer === 2 ? (probs[n.i] || 0) * 1.4 : n.a;
-    if (Math.abs(v) > .35) { g.fillStyle = col(v, .18); g.beginPath(); g.arc(n.px, n.py, r * 2.4, 0, 7); g.fill(); }
-    gem(n.px, n.py, r, col(v, alpha));
-    if (n.layer === 2 && n.i === chosen) {     // the game's green cursor brackets around its answer
-      const q = r + 6; g.strokeStyle = 'rgba(63,208,95,.95)'; g.lineWidth = 2;
-      for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { g.beginPath();
-        g.moveTo(n.px + sx * q, n.py + sy * (q - 4)); g.lineTo(n.px + sx * q, n.py + sy * q); g.lineTo(n.px + sx * (q - 4), n.py + sy * q); g.stroke(); }
-    }
-    if (n === hover) { g.strokeStyle = '#fff'; g.lineWidth = 1.2; g.strokeRect(n.px - r - 3, n.py - r - 3, 2 * r + 6, 2 * r + 6); }
-  }
-  // labels: the allowed answers and the 6 strongest live senses, spread so they never overlap
-  const topIn = new Set(nodes.filter(n => n.layer === 0 && n.group !== 1 && Math.abs(n.a) > .4).sort((a, b) => Math.abs(b.a) - Math.abs(a.a)).slice(0, 6));
-  g.font = '11px "Trebuchet MS","Segoe UI",sans-serif'; g.textBaseline = 'middle';
+  g.globalAlpha = 1;
+  // titles over each wall, the input groups, and the names that matter now: the allowed answers, the strongest senses
+  const font = (sz, w = 600) => `${w} ${sz}px ${css('--font')}`;
+  g.textBaseline = 'middle';
   const labs = [];
-  const cut = (txt, k) => txt.length > k ? txt.slice(0, k - 1) + '…' : txt;
-  for (const n of nodes) { const lab = (n.layer === 2 && probs[n.i] !== undefined) ? `${cut(beh(n.i), 20)}  ${pct(probs[n.i])}` : topIn.has(n) ? cut(n.name, 18) : null;
-    if (lab) labs.push({n, lab, y: n.py, side: n.layer === 2 ? 1 : -1}); }
-  for (const side of [1, -1]) { const c = labs.filter(l => l.side === side).sort((a, b) => a.y - b.y);
-    for (let k = 1; k < c.length; k++) c[k].y = Math.max(c[k].y, c[k - 1].y + 14); }
-  for (const {n, lab, y, side} of labs) {
-    const x = n.px + side * (n.r + 10);
-    if (Math.abs(y - n.py) > 3) { g.strokeStyle = 'rgba(163,163,155,.35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(n.px + side * n.r, n.py); g.lineTo(x - side * 2, y); g.stroke(); }
-    g.fillStyle = n.layer === 2 && n.i === chosen ? '#5fe07a' : 'rgba(242,242,238,.9)'; g.textAlign = side > 0 ? 'left' : 'right';
-    g.shadowColor = 'rgba(0,0,0,.8)'; g.shadowOffsetY = 1; g.fillText(lab, x, y); g.shadowColor = 'transparent';
+  if (b) {
+    for (const [a, p] of Object.entries(probs)) { const n = B3.nodes[B3.base[2] + +a]; labs.push({n, t: `${bs(+a)}  ${pct(p)}`, side: n.px >= W / 2 ? 1 : -1, hot: +a === best}); }
+    const strong = B3.nodes.filter(n => n.L === 0 && n.g !== 1 && Math.abs(b.inputs[n.i]) > .3)
+      .map(n => [n, NET.e1.filter(e => e[0] === n.i).reduce((v, e) => v + Math.abs(e[2] * b.inputs[n.i]), 0)]).sort((p, q) => q[1] - p[1]).slice(0, 3);
+    strong.forEach(([n]) => labs.push({n, t: senseLabel(NET.names[n.i]), side: n.px >= W / 2 ? 1 : -1, dim: true}));
   }
+  for (const side of [1, -1]) { const c = labs.filter(l => l.side === side).sort((p, q) => p.n.py - q.n.py); let last = -1e9;
+    for (const l of c) { l.y = Math.max(l.n.py, last + 15); last = l.y; } }
+  g.font = font(12, 500);
+  const edge = RIM * F.k * B3.zoom + 12;          // the names stand outside the sphere, a thin line to their node
+  for (const l of labs) { const x = W / 2 + l.side * edge;
+    l.y = Math.max(8, Math.min(H - 8, l.y));
+    g.strokeStyle = C.t3; g.globalAlpha = .45; g.lineWidth = 1; g.beginPath(); g.moveTo(l.n.px + l.side * l.n.r, l.n.py); g.lineTo(x - l.side * 4, l.y); g.stroke(); g.globalAlpha = 1;
+    g.fillStyle = l.hot ? C.own : l.dim ? C.t2 : C.t1; g.textAlign = l.side > 0 ? 'left' : 'right'; g.fillText(l.t, x, l.y); }
 }
-requestAnimationFrame(draw);
+(() => {
+  const cv = $('b3');
+  cv.addEventListener('pointerdown', e => { B3.drag = {x: e.clientX, y: e.clientY}; cv.setPointerCapture(e.pointerId); });
+  cv.addEventListener('pointerup', () => B3.drag = null);
+  cv.addEventListener('dblclick', () => { B3.yaw = B3_VIEW.yaw; B3.pitch = B3_VIEW.pitch; B3.zoom = 1; B3.dirty = true; });
+  cv.addEventListener('wheel', e => { e.preventDefault(); B3.zoom = Math.max(.6, Math.min(3, B3.zoom * (e.deltaY > 0 ? .92 : 1.08))); B3.dirty = true; }, {passive: false});
+  cv.addEventListener('pointerleave', () => { $('tip').style.display = 'none'; B3.hover = null; B3.dirty = true; });
+  cv.addEventListener('pointermove', e => {
+    if (B3.drag) { B3.yaw += (e.clientX - B3.drag.x) * .006; B3.pitch = Math.max(-1.2, Math.min(1.2, B3.pitch + (e.clientY - B3.drag.y) * .004));
+      B3.drag = {x: e.clientX, y: e.clientY}; B3.dirty = true; $('tip').style.display = 'none'; return; }
+    const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+    let best = null, bd = 10;
+    for (const n of B3.nodes) { const d = Math.hypot(n.px - mx, n.py - my); if (d < Math.max(bd, n.r || 0)) { bd = d; best = n; } }
+    if (best !== B3.hover) { B3.hover = best; B3.dirty = true; }
+    const tip = $('tip'), b = LIVE && LIVE.brain;
+    if (!best) { tip.style.display = 'none'; return; }
+    const v = !b ? '' : best.L === 0 ? `<br>now ${(+b.inputs[best.i]).toFixed(2)}` : best.L === 1 ? `<br>now ${(+b.hidden[best.i]).toFixed(2)}`
+      : b.probabilities[best.i] !== undefined ? `<br>${pct(b.probabilities[best.i])} chance now` : '<br>not allowed now';
+    const name = best.L === 0 ? (best.g === 1 ? `The game suggests: ${bs(best.i - 59)}` : `${senseLabel(NET.names[best.i])} (${best.gname})`) : best.L === 1 ? `Neuron ${best.i + 1}` : cap(beh(best.i));
+    tip.innerHTML = `<b>${esc(name)}</b>${v}`; tip.style.display = 'block';
+    tip.style.left = Math.min(innerWidth - 290, e.clientX + 14) + 'px'; tip.style.top = (e.clientY + 16) + 'px';
+  });
+})();
 
-cv.addEventListener('pointerdown', e => { cam.drag = {x: e.clientX, y: e.clientY}; cv.setPointerCapture(e.pointerId); });
-cv.addEventListener('pointerup', () => cam.drag = null);
-cv.addEventListener('dblclick', () => { cam.yaw = VIEW.yaw; cam.pitch = VIEW.pitch; cam.user = 1; dirty = true; });
-cv.addEventListener('pointermove', e => {
-  if (cam.drag) { cam.yaw += (e.clientX - cam.drag.x) * .006; cam.pitch = Math.max(-1.2, Math.min(1.2, cam.pitch + (e.clientY - cam.drag.y) * .004));
-    cam.drag = {x: e.clientX, y: e.clientY}; $('tip').style.display = 'none'; dirty = true; return; }
-  const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
-  let best = null, bd = 14;
-  for (const n of nodes) { const d = Math.hypot(n.px - mx, n.py - my); if (d < Math.max(bd, n.r || 0)) { bd = d; best = n; } }
-  if (best !== hover) { hover = best; dirty = true; }
-  const tip = $('tip');
-  if (!best) { tip.style.display = 'none'; return; }
-  const extra = best.layer === 2 && probs[best.i] !== undefined ? `<br>probability now <b>${pct(probs[best.i])}</b>` : '';
-  tip.innerHTML = `<b style="color:var(--yellow)">${esc(best.layer === 0 && best.group === 1 ? 'the game proposes: ' + beh(best.i - 59) : best.name)}</b><br>activation ${best.a.toFixed(2)}${extra}`;
-  tip.style.display = 'block'; tip.style.left = Math.min(innerWidth - 290, e.clientX + 14) + 'px'; tip.style.top = (e.clientY + 14) + 'px';
-});
-cv.addEventListener('pointerleave', () => { $('tip').style.display = 'none'; hover = null; dirty = true; });
-cv.addEventListener('wheel', e => { e.preventDefault();
-  cam.user = Math.max(.5, Math.min(3, (cam.user || 1) * (1 - Math.sign(e.deltaY) * .08))); dirty = true; }, {passive: false});
-
-/* ============================== the tiles ============================== */
-function feedBrain(b) {
-  if (!NET || !b) return;
-  const [i0, i1, i2] = NET.base;
-  b.inputs.forEach((v, k) => nodes[i0 + k].t = v); b.hidden.forEach((v, k) => nodes[i1 + k].t = v);
-  b.outputs.forEach((v, k) => nodes[i2 + k].t = Math.tanh(v));
-  instinct = b.proposal; allowed = new Set(b.allowed); probs = {};
-  Object.entries(b.probabilities).forEach(([k, v]) => probs[+k] = v);
-  chosen = +Object.entries(b.probabilities).sort((a, c) => c[1] - a[1])[0][0]; dirty = true;
+/* ------------------------------------------------------------ LIFE */
+let xTab = 'habits', xPage = 0;
+const TASTES = [['progress', 'Progress'], ['safety', 'Safety'], ['provisions', 'Items'], ['together', 'Together'], ['comfort', 'Comfort']];
+function radar(t) {                        // what matters to it: each taste against the strongest
+  const cx = 160, cy = 104, R = 72, mx = Math.max(...Object.values(t), 1e-6), ang = k => -Math.PI / 2 + k * 2 * Math.PI / 5;
+  const pt = (k, r) => [cx + Math.cos(ang(k)) * r, cy + Math.sin(ang(k)) * r].map(v => v.toFixed(1));
+  let s = '';
+  for (const f of [1, .5]) s += el('polygon', {points: TASTES.map((_, k) => pt(k, R * f).join(',')).join(' '), fill: 'none', stroke: css('--s3')});
+  s += el('polygon', {points: TASTES.map(([key], k) => pt(k, R * clamp01((t[key] || 0) / mx)).join(',')).join(' '), fill: css('--warm'), 'fill-opacity': .18, stroke: css('--warm'), 'stroke-width': 2, 'stroke-linejoin': 'round'});
+  TASTES.forEach(([key, lab], k) => { const [x, y] = pt(k, R + 16).map(Number);
+    s += el('text', {x, y: y + 4, fill: css('--t2'), 'font-size': 12, 'text-anchor': Math.abs(x - cx) < 5 ? 'middle' : x > cx ? 'start' : 'end'}, lab); });
+  return s;
 }
-function idx(name) { return NET ? NET.s.layers[0].names.indexOf(name) : -1; }
-function renderSenses(b) {
-  const v = name => { const i = idx(name); return b && i >= 0 ? b.inputs[i] : null; };
-  const setG = (id, x, cls) => { $(id).style.width = pct(Math.max(0, Math.min(1, x || 0))); if (cls !== undefined) $(id).className = cls; };
-  const hp = v('cat HP'), oh = v('owner HP');
-  setG('sHp', hp, hp < .3 ? 'hp-low' : hp < .6 ? 'hp-mid' : ''); $('sHpT').textContent = hp === null ? '—' : pct(hp);
-  setG('sOh', oh, oh < .3 ? 'hp-low' : oh < .6 ? 'hp-mid' : ''); $('sOhT').textContent = oh === null ? '—' : pct(Math.min(1, oh));
-  const lc = v('large monsters'), ld = v('nearest large: distance'), la = v('nearest large: attacking');
-  $('sLg').innerHTML = lc ? `${lc} · ${Math.round((ld || 0) * 5000)} away${la ? ' <span class="chip hot">attacking</span>' : ''}` : 'none';
-  setG('sLgB', lc ? 1 - (ld || 0) : 0);
-  const sc = v('small monsters'), sd = v('nearest small: distance');
-  $('sSm').textContent = sc ? `${sc} · nearest ${Math.round((sd || 0) * 5000)} away` : 'none'; setG('sSmB', sc ? 1 - (sd || 0) : 0);
-  $('sOw').textContent = LIVE ? LIVE.hunter.replace('_', ' ') : '—';
-  const own = b && b.owner;
-  const PROF = [['attacks', 'attacks'], ['hits_landed', 'lands hits'], ['hits_taken', 'gets hit'], ['heals_at_hp', 'heals at HP'],
-                ['low_hp', 'low on HP'], ['gathers', 'gathers'], ['runs', 'runs'], ['distance', 'far from it'], ['fights_alone', 'fights alone']];
-  $('sStyle').innerHTML = own ? PROF.map(([k, lab]) => {
-      const a = own[`owner ${k} (30 s)`] || 0, c = own[`owner ${k} (180 s)`] || 0;
-      return `<span class="k">${lab}</span><div class="gauge"><i class="blu" style="width:${pct(Math.min(1, a))}"></i></div>
-        <div class="gauge"><i class="dimb" style="width:${pct(Math.min(1, c))}"></i></div>`; }).join('')
-    : '<span class="muted">No game running.</span>';
-}
-const isChoice = k => { const b = META && META.behaviours[String(k)]; return !!b && /^(CHOICE|SUPPORT|COMBAT)/.test(b.category); };
-function renderDecision(live) {
-  const ds = (live && live.decisions || []).filter(d => isChoice(d.proposed) && !(d.probabilities && Object.keys(d.probabilities).length === 1));
-  const last = ds[0];
-  $('dEmpty').hidden = !!last; $('dBody').hidden = !last;
-  if (last) {
-    $('dProp').textContent = cap(beh(last.proposed));
-    $('dWhoL').textContent = last.by === 'brain' ? `${live.cat} does` : 'The game\'s own cat does';
-    $('dAns').textContent = cap(beh(last.chose)) + (last.chose !== last.proposed ? '  ·  its own choice' : '');
-    $('dAns').style.color = last.chose !== last.proposed ? 'var(--green2)' : 'var(--yellow)';
-    const pr = last.probabilities ? Object.entries(last.probabilities).sort((a, b) => b[1] - a[1]) : [];
-    $('dOpts').innerHTML = pr.map(([k, p]) => { const c = +k === last.chose ? 'sel' : '';
-      return `<span class="${c}">${esc(beh(k))}</span><div class="${c}"><div class="gauge"><i class="${c ? 'dimb' : 'amb'}" style="width:${pct(p)}"></i></div></div><span class="${c}">${pct(p)}</span>`; }).join('');
-    $('dSit').textContent = last.situation ? 'Seen as: ' + last.situation.split('|').join(' · ') : '';
-  }
-  const all = live && live.decisions || [];
-  const fit = $('tl').clientHeight > 30 ? Math.max(1, Math.floor($('tl').clientHeight / 23)) : 10;   // the rows that fit
-  $('tl').innerHTML = all.length ? all.slice(0, fit).map(d => {
-    const nc = !isChoice(d.proposed) || (d.probabilities && Object.keys(d.probabilities).length === 1);
-    const c = nc ? 'var(--dim)' : d.by === 'brain' ? (d.chose !== d.proposed ? 'var(--green2)' : 'var(--yellow)') : 'var(--blue)';
-    return `<div><span class="t">${Math.round(d.t)}s</span><i class="d" style="background:${c}"></i><span>${esc(beh(d.chose))}${
-      nc ? ' <span class="muted">· reaction</span>' : d.by === 'brain' ? (d.chose !== d.proposed ? ' <span class="muted">· its own</span>' : '') : ' <span class="muted">· game\'s cat</span>'}</span></div>`; }).join('')
-    : '<span class="muted">—</span>';
-}
-let xTab = 'H', xPage = 0;
-// the items of the current tab that fit the tile (no scroll bar): pages of n items, n from the space there is
-function page(items, perItem) {
-  const h = $('xBody').clientHeight, n = h > 40 ? Math.max(1, Math.floor(h / perItem)) : 8;
-  const pages = Math.max(1, Math.ceil(items.length / n));
-  xPage = Math.max(0, Math.min(xPage, pages - 1));
-  const many = items.length > n;
-  $('pgPrev').parentElement.style.visibility = many ? 'visible' : 'hidden';
-  $('pgInfo').textContent = many ? `${xPage + 1} / ${pages}` : '';
-  $('pgPrev').disabled = xPage <= 0; $('pgNext').disabled = xPage >= pages - 1;
-  return items.slice(xPage * n, xPage * n + n);
+function renderLife() {
+  $('iEmpty').hidden = !!CAT; $('iBox').hidden = !CAT;
+  if (!CAT) { $('xBody').innerHTML = ''; $('pager').style.visibility = 'hidden'; return; }
+  const p = CAT.passport, pers = META.personalities[p.personality] || {temperament: '?', attack: '?', meaning: {}}, m = pers.meaning, coat = coatOf(p);
+  $('iSw').style.background = coatCol(); $('iName').textContent = p.name;
+  $('iPers').textContent = [pers.temperament, pers.attack, coat, p.owner ? `with ${p.owner}` : ''].filter(Boolean).join(' · ');
+  const bh = lastBody(p), g = p.growth || {};
+  const K = [[bh ? bh.level : '—', 'level'], [bh ? bh.attack : '—', 'attack'], [bh ? bh.defence : '—', 'defence'],
+    [g.quests || 0, 'quests'], [g.decisions_lived || 0, 'decisions'], [CAT.habits ? CAT.habits.step : 0, 'lessons']];
+  $('iKpis').innerHTML = K.map(([v, l]) => `<div class="kpi"><b class="num">${v}</b><span>${l}</span></div>`).join('');
+  $('iKpis').title = bh ? `Training: ${TRAINING[bh.training] || '?'} · in control ${dur(g.attached_s)} · heals at ${m.heals_at_hp}% HP` : '';
+  const t = (LIVE && LIVE.brain && LIVE.brain.tastes) || (NET && NET.tastes);
+  $('radar').innerHTML = t ? radar(t) : '';
+  renderExperience();
 }
 function renderExperience() {
-  const b = $('xBody');
-  if (!CAT) { b.innerHTML = '<span class="muted">No cat selected.</span>'; page([], 1); return; }
-  const hb = CAT.habits, diary = CAT.diary || [];
-  if (xTab === 'H') {
-    const list = hb && hb.strongest || [];
-    b.innerHTML = list.length ? page(list, 62).map(h => `<div class="habit">When the game says
-      <b>${esc(beh(h.proposal))}</b>, it now does <b style="color:var(--green2)">${esc(beh(h.answer))}</b>
-      <div class="row" style="border:0;padding:3px 0 0"><div class="gauge" style="flex:1;margin:0"><i class="amb" style="width:${pct(h.probability)}"></i></div>
-      <span class="k" style="font-size:11px">${pct(h.probability)} · day one ${pct(h.day_one)}</span></div>
-      <div class="s">${esc(h.context.split('|').join(' · '))}</div></div>`).join('')
-      : (page([], 1), `<span class="muted">${hb ? `${hb.step} decisions lived — so far it always did what the game's own cat would do.` : 'Not lived yet: on day one it is the game\'s own cat.'}</span>`);
-  } else if (xTab === 'Q') {
-    const hist = (CAT.passport.history || []).slice().reverse();
-    b.innerHTML = hist.length ? `<table><thead><tr><th>When</th><th>Quest</th><th>Attached</th><th>Lived</th></tr></thead><tbody>${
-      page(hist, 25).map(h => `<tr><td>${esc(h.when.slice(5))}</td><td>${esc(h.quest)}</td><td>${mins(h.attached_s)}</td><td>${h.lived}</td></tr>`).join('')}</tbody></table>`
-      : (page([], 1), '<span class="muted">No quest yet.</span>');
+  const p = CAT.passport;
+  let rows = [], h = 56, table = null;
+  if (xTab === 'habits') {   // a dumbbell: day one (hollow) -> now (filled)
+    rows = (CAT.habits && CAT.habits.strongest || []).map(x => `<div class="it" title="When the game suggests ${esc(beh(x.proposal))}, it now goes for ${esc(beh(x.answer))}">
+      <div style="min-width:0"><div class="a">${esc(bs(x.answer))} <span>instead of ${esc(bs(x.proposal))}</span></div><div class="c">${esc(situation(x.context))}</div></div>
+      <div class="db" title="day one ${pct(x.day_one)} → now ${pct(x.probability)}"><i style="left:${pct(clamp01(Math.min(x.day_one, x.probability)))};width:${pct(Math.abs(x.probability - x.day_one))}"></i>
+        <u style="left:${pct(clamp01(x.day_one))}"></u><s style="left:${pct(clamp01(x.probability))}"></s></div><div class="p num">${pct(x.probability)}</div></div>`);
+    if (!rows.length) rows = ['<div class="empty" style="padding-top:48px">No habits yet: it still does what the game\'s cat would do</div>'];
+  } else if (xTab === 'diary') {
+    h = 48;
+    const K2 = {sour: ['var(--bad)', 'went badly'], faded: ['var(--t3)', 'given up'], habit: ['var(--own)', 'new habit']};
+    rows = (CAT.diary || []).slice().reverse().map(d => `<div class="dr"><i class="dot" style="background:${K2[d.kind][0]}"></i>
+      <div style="min-width:0"><div class="a">${esc(bs(d.answer))}${d.answer !== d.proposal ? ` <span class="t3">instead of ${esc(bs(d.proposal))}</span>` : ''}</div><div class="c">${esc(situation(d.context))}</div></div>
+      <span class="t3" style="font-size:13px">${K2[d.kind][1]}</span></div>`);
+    if (!rows.length) rows = ['<div class="empty" style="padding-top:48px">The diary is empty</div>'];
+  } else if (xTab === 'quests') {
+    h = 40; table = '<tr><th>When</th><th>Quest</th><th class="n">In control</th><th class="n">Decisions</th></tr>';
+    rows = (p.history || []).slice().reverse().map(q => `<tr><td class="num">${esc(q.when)}</td><td>${esc(q.quest)}</td><td class="n num">${dur(q.attached_s)}</td><td class="n num">${q.lived}</td></tr>`);
   } else {
-    const kinds = xTab === 'M' ? ['sour', 'faded'] : ['habit', 'faded', 'sour'];
-    const lines = diary.filter(d => kinds.includes(d.kind)).slice().reverse();
-    const say = d => d.kind === 'sour' ? `Doing <b>${esc(beh(d.answer))}</b> when the game said ${esc(beh(d.proposal))} went badly`
-      : d.kind === 'faded' ? `Gave up <b>${esc(beh(d.answer))}</b> instead of ${esc(beh(d.proposal))}`
-      : `Started doing <b>${esc(beh(d.answer))}</b> instead of ${esc(beh(d.proposal))} (${pct(d.probability)})`;
-    b.innerHTML = lines.length ? page(lines, 44).map(d => `<div class="habit">${say(d)}<div class="s">${esc((d.context || '').split('|').join(' · '))}</div></div>`).join('')
-      : (page([], 1), `<span class="muted">${xTab === 'M' ? 'No mistakes remembered yet.' : 'The diary is empty.'}</span>`);
+    h = 40; table = '<tr><th>When</th><th class="n">Level</th><th class="n">Attack</th><th class="n">Defence</th><th>Training</th></tr>';
+    rows = (p.body_history || []).slice().reverse().map(b => `<tr><td class="num">${esc(b.when)}</td><td class="n num">${b.level}</td><td class="n num">${b.attack}</td><td class="n num">${b.defence}</td><td>${TRAINING[b.training] || '—'}</td></tr>`);
   }
+  const H = $('xBox').clientHeight, n = Math.max(1, (H > h ? Math.floor(H / h) : 8) - (table ? 1 : 0)), pages = Math.max(1, Math.ceil(rows.length / n));
+  xPage = Math.max(0, Math.min(xPage, pages - 1));
+  const vis = rows.slice(xPage * n, xPage * n + n).join('');
+  $('xBody').innerHTML = table ? (rows.length ? `<table><thead>${table}</thead><tbody>${vis}</tbody></table>` : '<div class="empty" style="padding-top:48px">Nothing yet</div>') : vis;
+  $('pager').style.visibility = pages > 1 ? 'visible' : 'hidden';
+  $('pgInfo').textContent = `${xPage + 1} / ${pages}`; $('pgPrev').disabled = xPage === 0; $('pgNext').disabled = xPage >= pages - 1;
 }
-const X_TABS = [['xH', 'H'], ['xM', 'M'], ['xD', 'D'], ['xQ', 'Q']];
-for (const [id, k] of X_TABS) $(id).onclick = () => {
-  xTab = k; xPage = 0; X_TABS.forEach(([x]) => $(x).classList.toggle('on', x === id)); renderExperience(); };
+document.querySelectorAll('.tabs button[data-x]').forEach(b => b.onclick = () => {
+  xTab = b.dataset.x; xPage = 0; document.querySelectorAll('.tabs button[data-x]').forEach(c => c.classList.toggle('on', c === b)); if (CAT) renderExperience(); });
 $('pgPrev').onclick = () => { xPage--; renderExperience(); };
 $('pgNext').onclick = () => { xPage++; renderExperience(); };
-new ResizeObserver(() => renderExperience()).observe($('xBody'));
 
-function renderStatus() {
-  const s = STATUS, live = s && s.live, mine = live && CAT && live.passport === CAT.passport.id;
-  LIVE = s && s.running ? live : null;
-  let cls = '', txt = 'No game running';
-  if (LIVE) {
-    if (!live.brain_alive) { cls = 'bad'; txt = 'Brain stopped — the game\'s cat is back'; }
-    else if (live.attached) { cls = 'on'; txt = `${live.cat} is in control`; }
-    else { cls = 'wait'; txt = `${live.replaces || 'The game\'s cat'} in control · ${live.cat} waiting`; }
-  } else if (CAT) txt = `No game · ${CAT.passport.name}'s brain at rest`;
-  $('dot').className = cls; $('state').textContent = txt;
-  const btn = $('attach'); btn.disabled = !(LIVE && mine);
-  btn.textContent = s && s.wants_attached ? 'Detach' : 'Attach'; btn.classList.toggle('detach', !!(s && s.wants_attached));
-  if (LIVE && LIVE.brain) { feedBrain(LIVE.brain); if (mine) renderTastes(LIVE.brain.tastes, LIVE.brain.last_feeling); }
-  else if (NET && (instinct !== null || chosen !== null)) { nodes.forEach(n => n.t = 0); probs = {}; allowed = new Set(); instinct = null; chosen = null; dirty = true; }
-  renderSenses(LIVE && LIVE.brain); renderDecision(LIVE);
-  if (LIVE && LIVE.brain && NET && LIVE.brain.step !== NET.s.step && mine) refreshNet();
+/* ------------------------------------------------------------ everything */
+function renderChip() {
+  const p = CAT && CAT.passport, bh = lastBody(p);
+  $('chipSw').style.background = coatCol(); $('chipName').textContent = p ? p.name : 'No brain yet';
+  $('chipSub').textContent = bh ? `level ${bh.level}` : '';
 }
+function renderAll() {
+  renderControl(); renderChip();
+  const decs = (CAT && STATUS && STATUS.live && STATUS.live.decisions) || [];   // no cat: nothing of the last one
+  B3.open = VIEW === 'live'; B3.dirty = true;
+  if (VIEW === 'live') { renderHero(decs); renderTimeline(decs); renderRing(decs); renderSenses(); }
+  else if (META) renderLife();
+}
+function renderStatus() {
+  LIVE = STATUS && STATUS.running ? STATUS.live : null;
+  renderAll();
+  if (LIVE && LIVE.brain && NET && CAT && LIVE.passport === CAT.passport.id && LIVE.brain.step !== NET.step) refreshNet();
+}
+let resizeT = 0;
+addEventListener('resize', () => { B3.fit = null; B3.dirty = true; clearTimeout(resizeT); resizeT = setTimeout(() => { if (META) renderAll(); }, 120); });
 
-/* ============================== data ============================== */
+/* ------------------------------------------------------------ data */
+function buildNet(s) {
+  if (!s || !Array.isArray(s.layers) || s.layers.length !== 3 || !Array.isArray(s.layers[0].names) || !Array.isArray(s.edges))
+    throw new Error('incomplete brain answer');           // a partial answer (the C3 short of memory) never blanks the view
+  NET = {names: s.layers[0].names, e1: s.edges[0], e2: s.edges[1], step: s.step, tastes: s.tastes, last_feeling: s.last_feeling};
+}   // edges: [input, neuron, w] and [neuron, answer, w]
 let es = null, pollT = null;
-function connect() {
+function connect() {                       // the lab's PC pushes (/api/stream); the C3 has no stream: poll once a second
   if (es) es.close(); clearInterval(pollT);
   es = new EventSource(`/api/stream?instance=${$('instSel').value}`);
   es.onmessage = ev => { STATUS = JSON.parse(ev.data); renderStatus(); };
-  es.onerror = () => { es.close(); es = null; pollT = setInterval(async () => {
+  es.onerror = () => { es.close(); es = null; clearInterval(pollT); pollT = setInterval(async () => {
     try { STATUS = await api(`/api/status?instance=${$('instSel').value}`); renderStatus(); } catch (e) {} }, 1000); };
 }
 let netBusy = false, netAt = 0;
-async function refreshNet() {               // at most every 15 s: each one is the whole brain (the C3 is small)
+async function refreshNet() {              // at most every 15 s: the whole brain each time (the C3 is small)
   if (netBusy || !CAT || Date.now() - netAt < 15000) return; netBusy = true; netAt = Date.now();
-  try { buildNet(await api(`/api/brain/${CAT.passport.id}`)); CAT = await api(`/api/cats/${CAT.passport.id}`); renderCat(); } finally { netBusy = false; } }
-const TASTES = [['progress', 'getting on with it'], ['safety', 'staying safe'], ['provisions', 'provisions'],
-                ['together', 'staying together'], ['comfort', 'its own comfort']];
-function renderTastes(t, lf) {
-  if (t) { const mx = Math.max(...Object.values(t), 1);
-    $('tastes').innerHTML = TASTES.map(([k, lab]) => `<span class="k">${lab}</span><div class="gauge" style="margin:0"><i class="amb" style="width:${pct((t[k] || 0) / mx)}"></i></div>`).join(''); }
-  if (lf) $('lesson').textContent = `last lesson: ${lf.feeling > 0.15 ? 'better than usual' : lf.feeling < -0.15 ? 'worse than usual' : 'as usual'} (${lf.feeling > 0 ? '+' : ''}${lf.feeling.toFixed(2)})` +
-    (lf.praise > 0 ? ' · you praised it' : lf.praise < 0 ? ' · you scolded it' : '');
+  try { buildNet(await api(`/api/brain/${CAT.passport.id}`)); CAT = await api(`/api/cats/${CAT.passport.id}`); renderAll(); }
+  catch (e) {} finally { netBusy = false; }
 }
-const TRAINING = {1: 'Hand to Hand', 2: 'Dumbbells', 3: 'Sit-ups', 4: 'Forms', 5: 'Meditation', 6: 'Rest'};   // nature.TRAINING
-function renderCat() {
-  if (!CAT) return; const p = CAT.passport, pers = META.personalities[p.personality], m = pers.meaning;
-  $('cName').textContent = p.name;
-  const coat = p.coat !== null && p.coat !== undefined ? META.coats[p.coat] : null;
-  $('cCoat').innerHTML = coat ? `<i style="background:${COAT_RGB[coat] || '#888'}"></i>${esc(coat)} coat` : '<span class="muted">coat not set</span>';
-  $('cOrigin').textContent = p.origin === 'game' ? 'a comrade of the game' : p.origin === 'adopted' ? `adopted · lv ${p.adopted_from.level + 1}` : 'created here';
-  $('cPers').textContent = `${pers.temperament} / ${pers.attack}`;
-  $('cMeaning').innerHTML = `<div><span>ATTACKS</span>${m.weapon_share === null ? 'never' : m.weapon_share === 0 ? 'bombs only' : m.weapon_share === 100 ? 'weapon only' : `weapon ${m.weapon_share}% · bombs ${100 - m.weapon_share}%`}</div>
-    <div><span>HEALS AT</span>HP ≤ ${m.heals_at_hp}%</div><div><span>PREFERS</span>large ${m.aims_large}%</div><div><span>EVADES</span>large attacks ${m.evades_large}%</div>`;
-  // its BODY (5 Oct): the game cat it rides - level, stats, training and skills grow by the game's rules; in a quest the
-  // skills are the body's (equipped at the board), the card brings only the personality and the name
-  const bh = p.body && p.body_history && p.body_history.length ? p.body_history[p.body_history.length - 1] : null;
-  const skillName = b => META.skills[b] ? META.skills[b].name : `skill ${b}`;
-  if (bh) {
-    $('cBody').textContent = `${META.names[p.body.name_idx] || '?'} · lv ${bh.level} · atk ${bh.attack} / def ${bh.defence} · ${TRAINING[bh.training] || 'training ?'}`;
-    $('cSkills').innerHTML = (bh.equipped.length ? bh.equipped.map(b => `<span class="chip">${esc(skillName(b))}</span>`).join('') : '<span class="muted">No skill equipped</span>')
-      + (bh.learned.length ? ` <span class="muted" style="font-size:11px">learned: ${bh.learned.map(b => esc(skillName(b))).join(', ')}</span>` : '');
-  } else {
-    $('cBody').textContent = 'met at its first quest (the comrade equipped in the game)';
-    $('cSkills').innerHTML = p.skills.length ? p.skills.map(b => `<span class="chip">${esc(skillName(b))}</span>`).join('') : '<span class="muted">No skills</span>';
-  }
-  $('cOwner').textContent = p.owner + (p.adopted_from && p.adopted_from.first_leader ? ` · first leader ${p.adopted_from.first_leader}` : '');
-  $('cBorn').textContent = p.created;
-  $('gQ').textContent = p.growth.quests; $('gT').textContent = mins(p.growth.attached_s); $('gL').textContent = p.growth.decisions_lived;
-  renderExperience();
-}
-let HOME = {room: true, full: ''};
 async function loadCats(select) {
-  const r = await api('/api/cats'), cats = r.cats, keep = select || $('catSel').value || ls.get('felyne.cat');
-  HOME = {room: r.room !== false, full: r.full || '', waiting: !!r.waiting};
-  $('catSel').innerHTML = cats.length ? cats.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('') : '<option value="">No cat yet</option>';
-  if (keep && cats.some(c => c.id === keep)) $('catSel').value = keep;
-  await selectCat();
-}
-async function selectCat() {
-  const id = $('catSel').value; ls.set('felyne.cat', id);
-  if (!id) { CAT = null; NET = null; nodes.length = 0; renderExperience(); return; }
-  CAT = await api(`/api/cats/${id}`); buildNet(await api(`/api/brain/${id}`)); renderCat(); renderStatus();
-}
-async function loadMeta() {
-  META = await api('/api/meta');
+  const r = await api('/api/cats'), cats = r.cats;
+  HOME = {waiting: !!r.waiting};
+  const id = select && cats.some(c => c.id === select) ? select : cats.length ? cats[0].id : null;   // one cat per home
+  if (!id) { CAT = null; NET = null; } else { CAT = await api(`/api/cats/${id}`); try { buildNet(await api(`/api/brain/${id}`)); } catch (e) {} }
+  renderAll();
 }
 
-/* ============================== controls ============================== */
-function showNew() {                       // one cat per home: a full home offers to release the cat living here
-  const full = !HOME.room;
-  $('full').hidden = !full; $('newTabs').hidden = full;
-  $('fC').hidden = full || !$('tC').classList.contains('on');
+/* ------------------------------------------------------------ home */
+function renderHome() {
+  $('hFull').hidden = !CAT; $('hEmpty').hidden = !!CAT;
+  if (CAT) $('relName').textContent = CAT.passport.name;
   $('nWait').hidden = !HOME.waiting; $('nCancel').hidden = !HOME.waiting; $('nGo').hidden = HOME.waiting;
-  $('fB').hidden = full || !$('tB').classList.contains('on');
-  if (!$('fB').hidden) loadReleased();
-  $('fullWhy').textContent = HOME.full; $('relName').textContent = CAT ? CAT.passport.name : '';
-  $('mR').textContent = '';
+  if (!CAT) loadReleased();
 }
-$('openNew').onclick = () => { showNew(); $('dNew').classList.add('open'); };
+$('openHome').onclick = () => { $('mR').textContent = ''; $('mC').textContent = ''; $('mB').textContent = ''; renderHome(); $('home').hidden = false; };
+$('closeHome').onclick = () => $('home').hidden = true;
+$('home').onclick = e => { if (e.target === $('home')) $('home').hidden = true; };
+addEventListener('keydown', e => { if (e.key === 'Escape') $('home').hidden = true; });
 $('fR').onsubmit = async ev => { ev.preventDefault(); if (!CAT) return;
-  const f = new FormData(ev.target);
-  try { await api('/api/release', {id: CAT.passport.id, confirm: f.get('confirm')});
-    $('mR').className = 'msg ok'; $('mR').textContent = `${CAT.passport.name} is archived.`; ev.target.reset();
-    await loadCats(); showNew(); }
-  catch (e) { $('mR').className = 'msg err'; $('mR').textContent = e.message; } };
-$('closeNew').onclick = () => $('dNew').classList.remove('open');
-addEventListener('keydown', e => { if (e.key === 'Escape') $('dNew').classList.remove('open'); });
-const N_TABS = [['tC', 'fC'], ['tB', 'fB']];
-for (const [t, f] of N_TABS) $(t).onclick = () => {
-  N_TABS.forEach(([t2, f2]) => { $(t2).classList.toggle('on', t2 === t); $(f2).hidden = f2 !== f; });
-  if (f === 'fB') loadReleased(); };
-async function loadReleased() {            // the cats released from this home, to bring one back
-  $('mB').textContent = '';
-  try { const r = (await api('/api/released')).released;
-    $('bList').innerHTML = r.length ? r.map(c => `<div class="row"><span><b>${esc(c.name)}</b>
-      <span class="muted">· ${c.quests} quests · released ${esc(c.released)}</span></span>
-      <button data-a="${esc(c.archive)}">Bring back</button></div>`).join('') : '<span class="muted">No cat was released from this home.</span>';
-    $('bList').querySelectorAll('button').forEach(b => b.onclick = async () => {
-      try { const x = await api('/api/return', {archive: b.dataset.a});
-        $('mB').className = 'msg ok'; $('mB').textContent = `${x.describe.split(' (')[0]} is home again.`; await loadCats(x.returned); showNew(); }
-      catch (e) { $('mB').className = 'msg err'; $('mB').textContent = e.message; } }); }
-  catch (e) { $('bList').innerHTML = ''; $('mB').className = 'msg err'; $('mB').textContent = e.message; } }
-$('catSel').onchange = selectCat;
-$('instSel').onchange = () => { ls.set('felyne.instance', $('instSel').value); connect(); };
-$('attach').onclick = async () => { $('attach').disabled = true;
-  try { STATUS = await api('/api/attach', {instance: +$('instSel').value, attached: !STATUS.wants_attached}); renderStatus(); }
-  catch (e) { $('state').textContent = e.message; } };
-$('fC').onsubmit = async ev => { ev.preventDefault();      // a new brain: the next quest's comrade receives it
-  try { const r = await api('/api/cats', {}); $('mC').className = 'msg ok'; $('mC').textContent = r.describe || 'Waiting for its comrade.';
-    await loadCats(); showNew(); }
-  catch (e) { $('mC').className = 'msg err'; $('mC').textContent = e.message; } };
+  const name = CAT.passport.name, f = new FormData(ev.target);
+  try { await api('/api/release', {id: CAT.passport.id, confirm: f.get('confirm')}); ev.target.reset(); await loadCats(); renderHome(); toast(`${name} is archived in the home.`); }
+  catch (e) { $('mR').className = 'msg err'; $('mR').textContent = cap(e.message); } };
+$('fC').onsubmit = async ev => { ev.preventDefault();
+  try { await api('/api/cats', {}); await loadCats(); renderHome(); }
+  catch (e) { $('mC').className = 'msg err'; $('mC').textContent = cap(e.message); } };
 $('nCancel').onclick = async () => {
-  try { await api('/api/cats', {cancel: true}); $('mC').className = 'msg'; $('mC').textContent = 'Cancelled.'; await loadCats(); showNew(); }
-  catch (e) { $('mC').className = 'msg err'; $('mC').textContent = e.message; } };
+  try { await api('/api/cats', {cancel: true}); await loadCats(); renderHome(); }
+  catch (e) { $('mC').className = 'msg err'; $('mC').textContent = cap(e.message); } };
+async function loadReleased() {
+  try { const r = (await api('/api/released')).released;
+    $('bList').innerHTML = r.map(c => `<div class="rel"><span class="grow"><b>${esc(c.name)}</b><span class="t3"> · ${c.quests} quests · ${esc(c.released)}</span></span>
+      <button data-a="${esc(c.archive)}">Bring back</button></div>`).join('');
+    $('bList').querySelectorAll('button').forEach(b => b.onclick = async () => {
+      try { const x = await api('/api/return', {archive: b.dataset.a}); await loadCats(x.returned); $('home').hidden = true;
+        toast(`${CAT ? CAT.passport.name : 'It'} is home again.`); }
+      catch (e) { $('mB').className = 'msg err'; $('mB').textContent = cap(e.message); } }); }
+  catch (e) { $('bList').innerHTML = ''; $('mB').className = 'msg err'; $('mB').textContent = cap(e.message); }
+}
 
+/* ------------------------------------------------------------ start */
+$('instSel').hidden = !/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);   // several games only on the lab's PC
+$('instSel').onchange = () => { ls.set('otomo.instance', $('instSel').value); connect(); };
 (async () => {
-  const inst = ls.get('felyne.instance'); if (inst) $('instSel').value = inst;
-  await loadMeta(); await loadCats(); connect();
-  setInterval(() => { if (CAT) api(`/api/cats/${CAT.passport.id}`).then(c => { CAT = c; renderCat();
-    if (NET && c.habits && c.habits.step !== NET.s.step) refreshNet(); }).catch(() => {}); }, 8000);   // lessons after a quest too
+  const inst = ls.get('otomo.instance'); if (inst) $('instSel').value = inst;
+  if (ls.get('otomo.view') === 'life') VIEW = 'life';
+  try { META = await api('/api/meta'); await loadCats(); } catch (e) { toast(`Could not reach the home: ${e.message}`); }
+  show(VIEW); connect(); requestAnimationFrame(b3draw);
+  setInterval(() => { if (!CAT) { api('/api/cats').then(r => { if (r.cats.length || !!r.waiting !== HOME.waiting) loadCats(); }).catch(() => {}); return; }
+    api(`/api/cats/${CAT.passport.id}`).then(c => { CAT = c; renderChip(); if (VIEW === 'life') renderLife();
+      if (NET && c.habits && c.habits.step !== NET.step) refreshNet(); }).catch(() => {}); }, 8000);   // lessons after a quest too
 })();
 </script>
 </body>
