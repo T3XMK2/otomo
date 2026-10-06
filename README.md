@@ -1,75 +1,81 @@
-# Otomo — a brain for your Felyne comrade
+# Otomo <sup>オトモ</sup>
 
-*Otomo* (オトモ) is what the game calls its comrades: the companion. This is a small neural **brain** for the Felyne
-comrade of *Monster Hunter Freedom Unite*. It rides a comrade of your own game,
-as the game made it, and learns its own habits from the way **you** play: when the game's cat would follow you, attack,
-gather, play a flute or set a trap, the brain may choose differently — within what that cat is allowed to do — and it
-remembers how each choice turned out for the team. It starts as a novice: on day one it does what the game's cat would
-do.
+**Adaptive behavior for your Felyne comrade in Monster Hunter Freedom Unite.**
 
-Two parts:
+[Installation](docs/SETUP.md) · [Usage](#usage) · [Protocol](docs/PROTOCOL.md) · [Issues](https://github.com/T3XMK2/otomo/issues)
 
-| Part | Where | What it does |
-|---|---|---|
-| **The body** | a plugin inside the game (`psp/`) | reads what the cat sees (its state, its hunter, the monsters, the game's proposals, hits, traps), sends it to the home, applies the brain's answers. It never changes the cat itself: name, temperament, skills, level and training stay the game's. |
-| **The home** | an ESP32-C3 board on your Wi-Fi (`esp32c3/`) | the brain: decides, learns, keeps a diary of its habits and mistakes, and serves a small site to watch it think and to attach / detach it. |
+---
 
-They talk over UDP (port 7777): see [docs/PROTOCOL.md](docs/PROTOCOL.md).
+Otomo gives your in-game comrade a neural brain on an **ESP32-C3**. A plugin observes the hunt, the board chooses how to respond, and the brain learns from the consequences for you and your Felyne.
 
-## What you need
+It begins with a preference for the game's own decisions. As you hunt together, its choices can develop into habits: when to fight, stay close, gather or offer support. Its name, temperament, skills and progression continue to follow the game's rules.
 
-- *Monster Hunter Freedom Unite*, **EU version, ULES01213 v1.01** (your own copy), on **PPSSPP** with plugins enabled.
-  Other versions use other addresses and are not supported. A real PSP is not tested.
-- An **ESP32-C3** board (developed on a "SuperMini") on the same network as the PC running PPSSPP.
-- To build: [pspdev](https://github.com/pspdev/pspdev) (the plugin) and [PlatformIO](https://platformio.org/) (the board).
+> **Current target:** PPSSPP on PC · MHFU EU `ULES01213 v1.01` · solo quests.  
+> Otomo is experimental. Other game versions are unsupported; co-op and real PSP hardware are untested.
 
-## Build and install
+## What Otomo adds
 
-**The plugin** (in a shell with pspdev):
+**Experience that persists.** The brain and diary are stored on the board. Its history grows across quests, alongside records of the comrade's normal progression.
 
-```bash
-cd psp
-./build.sh otomo_boot
-./build.sh otomo_body
-```
+**Decisions you can inspect.** Open the board's web interface to explore its choices, learned habits and quest history, and to choose when the brain takes control.
 
-Copy into PPSSPP's memory stick, folder `PSP/PLUGINS/otomo/`:
+**Learning within the game's rules.** The brain selects from allowed alternatives to a proposed action. The comrade's existing abilities define what it can do.
 
-- `otomo_boot/plugin.ini` and `otomo_boot/otomo_boot.prx` (the loader the game boots with),
-- `otomo_body/otomo_body.prx` (the body; the loader starts it at your first quest),
-- `otomo_body.cfg`: one line, the board's address and port, e.g. `10.0.0.42 7777` (see `psp/otomo_body.cfg.example`).
+## Architecture
 
-In PPSSPP's settings enable plugins (`EnablePlugins = True`, `LoadPlugins = True` in `ppsspp.ini`).
+| In the game · **Body** | On the board · **Home** |
+| :--- | :--- |
+| A PSP plugin reads the hunt and the game's proposed behaviors, then applies the selected responses. | The ESP32-C3 interprets observations, runs the neural brain, learns and stores experience. |
 
-**The board:**
+The two components communicate over your local network using **UDP port 7777**. The board also serves the dashboard over **HTTP**, so you can access it from a browser. All neural computation runs on the ESP32-C3.
+
+[Read the communication protocol →](docs/PROTOCOL.md)
+
+## Installation
+
+Prepare an **ESP32-C3**—development uses a SuperMini—and a PC running **PPSSPP** with your own copy of the supported game. Both devices must share a local network.
+
+You will use [PlatformIO](https://platformio.org/) to flash the board and [pspdev](https://github.com/pspdev/pspdev) to build the plugins.
 
 ```bash
-cd esp32c3/otomo_link
-pio run -t upload       # the firmware
-pio run -t uploadfs     # the file system: the site and the game's lists - no cat yet
+git clone https://github.com/T3XMK2/otomo.git
+cd otomo
 ```
 
-Wi-Fi: copy `include/wifi_secrets.h.example` to `include/wifi_secrets.h` and fill it in, or leave it out and the board
-starts WPS (press your router's WPS button). The serial console (`pio device monitor`) prints the board's address.
+**[Open the setup guide →](docs/SETUP.md)**
 
-## Use
+The guide covers Wi-Fi configuration, firmware upload, plugin compilation, PPSSPP installation and troubleshooting.
 
-1. Open the board's address in a browser: the site. The home is empty.
-2. Press **New brain**.
-3. In the game, hire / equip the comrade you want (at the Comrade Board) and take it on a quest: at the quest's start
-   that comrade receives the brain. From then on the brain rides only that cat.
-4. Press **Attach** on the site during a quest: the brain decides. **Detach** gives the game's own cat back. If the
-   board is switched off or the Wi-Fi drops, the game's cat takes over by itself within two seconds.
-5. Train the comrade at the board as usual: its level, stats and skills grow by the game's rules; the site keeps that
-   growth, and the brain's habits, diary and quests.
+## Usage
 
-## Safety
+1. **Create a brain.** Visit `http://<board-ip>/`. Open **Home** and select **Give a brain to my next comrade**.
+2. **Choose its comrade.** Equip your Felyne at the in-game Comrade Board and start a quest. The waiting brain becomes associated with that comrade.
+3. **Start learning.** Select **Let &lt;name&gt; decide** in the dashboard and play. Use **Give control back** to return decisions to the game.
 
-- The body writes only its own memory block and a few hooks; the comrade's data and the save are never written.
-- Every answer of the brain is one the game's cat could give in that moment; outside them the game decides.
-- Without a fresh answer for 2 seconds the game's cat decides again (a lease on the quest timer).
+One board holds one active brain, associated with one Felyne. Equipping another comrade does not transfer it. The dashboard can archive a resident and bring it back into an empty home later.
 
-## Status
+## Control and persistence
 
-A research project. It works on PPSSPP (EU v1.01), solo quests. Co-op and real hardware are not tested. Not affiliated
-with Capcom; *Monster Hunter* is a trademark of Capcom.
+- **Automatic fallback:** decisions carry a two-second lease measured on the quest timer. If fresh answers stop arriving, the game's behavior resumes. The lease is cleared between quests.
+- **Game data stays with the game:** the plugin writes its own memory block and required hooks, without writing comrade data or the save file.
+- **Experience is saved:** new learning is stored approximately once a minute and at quest end. Replacing the board's filesystem with `uploadfs` requires backing up existing memories first.
+
+## Development
+
+The project separates game-specific hooks from the brain and its web interface:
+
+```text
+psp/
+  otomo_boot/     Plugin loader
+  otomo_body/     Game hooks and communication
+esp32c3/
+  otomo_link/     Brain, learning, storage and web server
+web/             Dashboard source
+docs/            Setup and protocol documentation
+```
+
+[Report a bug](https://github.com/T3XMK2/otomo/issues) with your game version, PPSSPP version, board model and steps to reproduce it. Include relevant logs with Wi-Fi credentials removed.
+
+---
+
+[MIT License](LICENSE) · An independent project, not affiliated with or endorsed by Capcom. *Monster Hunter* is a trademark of Capcom.
